@@ -188,6 +188,8 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .rgt tbody th{text-align:left;font-weight:700;white-space:normal;min-width:120px;position:sticky;left:0;background:var(--bg)}
 .rgt .cell{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:6px;font-weight:800;font-size:13px;color:var(--muted)}
 .rgt .cell.land{background:var(--locked);color:#fff}.rgt .cell.miss{background:var(--miss);color:#fff}
+.rgt tr.gone th{color:var(--muted)}
+.rgt .cell.none{opacity:.5}
 .rgt .pct{font-family:var(--label);font-weight:700}
 .runrow .score b{font-family:var(--display);font-weight:400;font-size:26px;color:var(--ink)}
 .marks{display:flex;flex-wrap:wrap;gap:3px}
@@ -335,7 +337,7 @@ const locName=id=>state.locations.find(l=>l.id===id)?.name||'';
 const obstaclesOf=id=>{const l=state.locations.find(x=>x.id===id);return Array.isArray(l?.obstacles)?l.obstacles:[]};
 const fullName=t=>t.stance&&t.stance!=='Regular'&&!t.name.toLowerCase().startsWith(t.stance.toLowerCase())?t.stance+' '+t.name.charAt(0).toLowerCase()+t.name.slice(1):t.name;
 
-let state={riders:{a:{name:'Skater 1'},b:{name:'Skater 2'}},tricks:[],goals:[],locations:[],runs:[],boards:[],shoes:[]};
+let state={riders:{a:{name:'Skater 1'},b:{name:'Skater 2'}},tricks:[],goals:[],locations:[],runs:[],boards:[],shoes:[],runDefs:[]};
 let sheetOnClose=null;
 let pendingLocDel=null;
 let ui={rider:'a',filter:'all',loc:'all'};
@@ -374,7 +376,7 @@ function showApp(on){$('#app').hidden=!on;$('#login').hidden=on}
 
 function boot(){
   render();
-  if(window.PREVIEW_DATA){const d=window.PREVIEW_DATA;state.riders=d.riders||state.riders;['tricks','goals','locations','runs','boards','shoes'].forEach(k=>state[k]=d[k]||[]);state.bg=d.background||'';applyBg();showApp(true);$('#sync').textContent='Preview · not saved';render();return}
+  if(window.PREVIEW_DATA){const d=window.PREVIEW_DATA;state.riders=d.riders||state.riders;['tricks','goals','locations','runs','boards','shoes','runDefs'].forEach(k=>state[k]=d[k]||[]);state.bg=d.background||'';applyBg();showApp(true);$('#sync').textContent='Preview · not saved';render();return}
   if(!window.firebase||String(firebaseConfig.apiKey).startsWith('PASTE')){
     showApp(false);
     $('#loginNote').textContent='Almost there. Paste your Firebase settings into index.html, as described in README.md.';
@@ -408,7 +410,7 @@ function convertSpots(){
     sp.slice(1).forEach((x,i)=>store.put('tricks',id+'-'+(i+1),{...rest,locId:x.locId,obstacle:x.obstacle||'',created:Date.now(),updated:Date.now()}));
   });
 }
-function stopSync(){subs.forEach(f=>f());subs=[];state.tricks=[];state.goals=[];state.locations=[];state.runs=[];state.boards=[];state.shoes=[];state.bg='';applyBg();render()}
+function stopSync(){subs.forEach(f=>f());subs=[];state.tricks=[];state.goals=[];state.locations=[];state.runs=[];state.boards=[];state.shoes=[];state.runDefs=[];state.bg='';applyBg();render()}
 function applyBg(){const el=$('#bgimg');el.style.backgroundImage=state.bg?`url("${state.bg}")`:'';el.hidden=!state.bg;document.body.classList.toggle('hasbg',!!state.bg)}
 function shrinkBg(file){
   return new Promise((res,rej)=>{
@@ -432,7 +434,8 @@ function startSync(){
   subs.push(db.collection('goals').onSnapshot(M,s=>{state.goals=rows(s);if(!s.metadata.fromCache)firstG=true;done();render()},fail));
   subs.push(db.doc('app/background').onSnapshot(s=>{state.bg=s.exists?(s.data().photo||''):'';applyBg()},fail));
   subs.push(db.collection('locations').onSnapshot(s=>{state.locations=rows(s);render()},fail));
-  subs.push(db.collection('runs').onSnapshot(s=>{state.runs=rows(s);render()},fail));
+  subs.push(db.collection('runs').onSnapshot(M,s=>{state.runs=rows(s);if(!s.metadata.fromCache){runsReady=true;migrateRuns()}render()},fail));
+  subs.push(db.collection('runDefs').onSnapshot(M,s=>{state.runDefs=rows(s);if(!s.metadata.fromCache){defsReady=true;migrateRuns()}render()},fail));
   subs.push(db.collection('boards').onSnapshot(s=>{state.boards=rows(s);render()},fail));
   subs.push(db.collection('shoes').onSnapshot(s=>{state.shoes=rows(s);render()},fail));
 }
@@ -440,7 +443,7 @@ function startSync(){
 async function exportData(){
   let trickPhotos=[];
   if(store.db){toast('Preparing backup…');try{const snap=await store.db.collection('trickPhotos').get();trickPhotos=snap.docs.map(d=>({...d.data(),id:d.id}))}catch(e){toast('Trick photos couldn’t be included. Check your connection.')}}
-  const out={trickPhotos,app:'skate-log',version:1,exported:new Date().toISOString(),riders:state.riders,background:state.bg||'',tricks:state.tricks,goals:state.goals,locations:state.locations,runs:state.runs,boards:state.boards,shoes:state.shoes};
+  const out={trickPhotos,app:'skate-log',version:1,exported:new Date().toISOString(),riders:state.riders,background:state.bg||'',tricks:state.tricks,goals:state.goals,locations:state.locations,runs:state.runs,boards:state.boards,shoes:state.shoes,runDefs:state.runDefs};
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,1)],{type:'application/json'}));
   a.download=`skate-log-backup-${today()}.json`;document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
@@ -451,7 +454,7 @@ async function importData(file){
   const ops=[];
   if(d.riders)ops.push(['app','riders',d.riders]);
   if(d.background)ops.push(['app','background',{photo:d.background}]);
-  ['tricks','goals','locations','runs','boards','shoes'].forEach(c=>(d[c]||[]).forEach(({id,...rest})=>{if(id)ops.push([c,id,rest])}));
+  ['tricks','goals','locations','runs','boards','shoes','runDefs'].forEach(c=>(d[c]||[]).forEach(({id,...rest})=>{if(id)ops.push([c,id,rest])}));
   toast(`Importing ${ops.length} items…`);
   try{
     for(let i=0;i<ops.length;i+=400){const b=store.db.batch();ops.slice(i,i+400).forEach(([c,id,data])=>b.set(store.db.doc(c+'/'+id),data));await b.commit()}
@@ -981,43 +984,105 @@ function nowLocal(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${
 const fmtDT=at=>{if(!at)return'';const d=new Date(at);return isNaN(d)?'':d.toLocaleString(undefined,{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})};
 function runScore(r){const it=r.items||[];return{land:it.filter(i=>i.res==='land').length,miss:it.filter(i=>i.res==='miss').length,total:it.length}}
 function runSig(r){const it=r.items||[];return it.length?(r.locId||'')+'|'+it.map(i=>(i.tid||i.name)+'~'+(i.obstacle||'')).join(','):'solo:'+r.id}
+const groupKey=r=>r.defId||runSig(r);
+const defOf=r=>r&&r.defId?state.runDefs.find(x=>x.id===r.defId):null;
+const itemKey=i=>(i.tid||i.name)+'~'+(i.obstacle||'');
+const stripItems=items=>(items||[]).map(i=>({tid:i.tid||'',name:i.name,obstacle:i.obstacle||''}));
 function runGroups(rider){
   const m=new Map();
-  state.runs.filter(r=>r.rider===rider).sort((a,b)=>String(b.at).localeCompare(String(a.at))).forEach(r=>{const k=runSig(r);if(!m.has(k))m.set(k,[]);m.get(k).push(r)});
+  state.runs.filter(r=>r.rider===rider).sort((a,b)=>String(b.at).localeCompare(String(a.at))).forEach(r=>{const k=groupKey(r);if(!m.has(k))m.set(k,[]);m.get(k).push(r)});
   return [...m.values()];
 }
-function groupOf(id){const r=state.runs.find(x=>x.id===id);if(!r)return[];const k=runSig(r);return state.runs.filter(x=>x.rider===r.rider&&runSig(x)===k).sort((a,b)=>String(b.at).localeCompare(String(a.at)))}
+function groupOf(id){const r=state.runs.find(x=>x.id===id);if(!r)return[];const k=groupKey(r);return state.runs.filter(x=>x.rider===r.rider&&groupKey(x)===k).sort((a,b)=>String(b.at).localeCompare(String(a.at)))}
+let runsReady=false,defsReady=false,migratedRuns=false;
+function migrateRuns(){
+  // older tries had no run definition: give each set of matching tries a shared one (same id on every device)
+  if(migratedRuns||!store.db||!runsReady||!defsReady)return;migratedRuns=true;
+  const m=new Map();
+  state.runs.filter(r=>!r.defId).forEach(r=>{const k=r.rider+'#'+runSig(r);if(!m.has(k))m.set(k,[]);m.get(k).push(r)});
+  m.forEach(tries=>{
+    tries.sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+    const latest=tries[tries.length-1],defId='def-'+tries[0].id;
+    if(!state.runDefs.some(x=>x.id===defId))store.put('runDefs',defId,{rider:latest.rider,name:latest.name||'Run',locId:latest.locId||'',items:stripItems(latest.items),created:Date.now(),updated:Date.now()});
+    tries.forEach(t=>{const {id,...rest}=t;store.put('runs',id,{...rest,defId})});
+  });
+}
 function runGroupRow(tries){
-  const r=tries[0];if(tries.length===1)return runRow(r);
+  const r=tries[0];if(tries.length===1)return runRow(r);const def=defOf(r);
   const loc=locName(r.locId);const sc=runScore(r);
   const best=Math.max(...tries.map(t=>runScore(t).land));
   const meta=[`${tries.length} tries`,'last '+fmtDT(r.at),loc].filter(Boolean).join(' · ');
-  return `<button class="runrow" data-rg="${esc(r.id)}"><span class="t"><span class="tn">${esc(r.name||'Run')}</span><span class="tm">${esc(meta)}</span>${sc.total?`<span class="marks" aria-hidden="true">${(r.items||[]).map(i=>`<i class="${esc(i.res||'')}"></i>`).join('')}</span>`:''}</span><span class="score" aria-label="Latest ${sc.land} of ${sc.total} landed, best ${best}"><b>${sc.land}</b>/${sc.total}<small class="best">best ${best}</small></span></button>`;
+  return `<button class="runrow" data-rg="${esc(r.id)}"><span class="t"><span class="tn">${esc(def?.name||r.name||'Run')}</span><span class="tm">${esc(meta)}</span>${sc.total?`<span class="marks" aria-hidden="true">${(r.items||[]).map(i=>`<i class="${esc(i.res||'')}"></i>`).join('')}</span>`:''}</span><span class="score" aria-label="Latest ${sc.land} of ${sc.total} landed, best ${best}"><b>${sc.land}</b>/${sc.total}<small class="best">best ${best}</small></span></button>`;
 }
 function newTryFrom(r,back){
-  const nid=uid();const nd={rider:r.rider,name:r.name,locId:r.locId||'',at:nowLocal(),items:(r.items||[]).map(i=>({tid:i.tid,name:i.name,res:'',obstacle:i.obstacle||''})),created:Date.now(),updated:Date.now()};
+  const def=defOf(r)||r;
+  const nid=uid();const nd={rider:r.rider,defId:r.defId||'',name:def.name||r.name,locId:def.locId||'',at:nowLocal(),items:(def.items||[]).map(i=>({tid:i.tid,name:i.name,res:'',obstacle:i.obstacle||''})),created:Date.now(),updated:Date.now()};
   store.put('runs',nid,nd);runSheet(nid,nd,back);toast('New try started');
 }
 function runGroupSheet(id){
   const tries=groupOf(id);if(!tries.length)return;
   if(tries.length===1){runSheet(tries[0].id);return}
-  const latest=tries[0],items=latest.items||[],chron=tries.slice().reverse();
+  const latest=tries[0],def=defOf(latest),chron=tries.slice().reverse();
+  const items=[...(def?def.items:latest.items)||[]];
+  const keys=new Set(items.map(itemKey));
+  chron.slice().reverse().forEach(t=>(t.items||[]).forEach(i=>{const k=itemKey(i);if(!keys.has(k)){keys.add(k);items.push({...i,gone:true})}}));
   const back=()=>{const g=groupOf(latest.id);runGroupSheet(g.length?g[0].id:latest.id)};
-  const stats=items.map((it,i)=>{const res=chron.map(t=>(t.items||[])[i]?.res||'');const land=res.filter(x=>x==='land').length,tried=res.filter(Boolean).length;return {it,res,land,tried}});
-  const tot=tries.map(runScore),best=Math.max(...tot.map(x=>x.land)),avg=tot.reduce((a,x)=>a+x.land,0)/tries.length;
+  const stats=items.map(it=>{const k=itemKey(it);const res=chron.map(t=>{const f=(t.items||[]).find(x=>itemKey(x)===k);return f?(f.res||''):'none'});const land=res.filter(x=>x==='land').length,tried=res.filter(x=>x==='land'||x==='miss').length;return {it,res,land,tried}});
+  const tot=tries.map(runScore),best=Math.max(...tot.map(x=>x.land)),avg=tot.reduce((a,x)=>a+x.land,0)/tries.length;const nNow=items.filter(i=>!i.gone).length;
   const dShort=at=>{const d=new Date(at);return isNaN(d)?'':d.toLocaleDateString(undefined,{day:'numeric',month:'short'})};
-  openSheet(`<h2>${esc(latest.name||'Run')}</h2>
-    <p class="note" style="margin:0">${[locName(latest.locId),`${tries.length} tries`,`${items.length} tricks`].filter(Boolean).map(esc).join(' · ')}</p>
-    <div class="strip"><div class="stat"><span class="lbl">Best</span><b>${best}<small>/${items.length}</small></b></div><div class="stat"><span class="lbl">Average</span><b>${avg.toFixed(1)}</b></div><div class="stat"><span class="lbl">Latest</span><b>${tot[0].land}<small>/${items.length}</small></b></div></div>
+  openSheet(`<h2>${esc(def?.name||latest.name||'Run')}</h2>
+    <p class="note" style="margin:0">${[locName(def?def.locId:latest.locId),`${tries.length} tries`,`${nNow} tricks`].filter(Boolean).map(esc).join(' · ')}</p>
+    <div class="strip"><div class="stat"><span class="lbl">Best</span><b>${best}</b></div><div class="stat"><span class="lbl">Average</span><b>${avg.toFixed(1)}</b></div><div class="stat"><span class="lbl">Latest</span><b>${tot[0].land}<small>/${tot[0].total}</small></b></div></div>
     <span class="lbl">Each trick across every try</span>
     <div class="rgwrap"><table class="rgt"><thead><tr><th scope="col">Trick</th>${chron.map((t,j)=>`<th scope="col" title="${esc(fmtDT(t.at))}">${j+1}<small>${esc(dShort(t.at))}</small></th>`).join('')}<th scope="col">Landed</th></tr></thead>
-      <tbody>${stats.map(({it,res,land,tried})=>`<tr><th scope="row">${esc(it.name)}${it.obstacle?`<small>${esc(it.obstacle)}</small>`:''}</th>${res.map(x=>`<td><span class="cell ${x}" aria-label="${x==='land'?'Landed':x==='miss'?'Missed':'Not tried'}">${x==='land'?'✓':x==='miss'?'✕':'·'}</span></td>`).join('')}<td class="pct">${land}/${tried||0}</td></tr>`).join('')}</tbody></table></div>
+      <tbody>${stats.map(({it,res,land,tried})=>`<tr class="${it.gone?'gone':''}"><th scope="row">${esc(it.name)}${it.obstacle||it.gone?`<small>${[it.obstacle,it.gone?'no longer in run':''].filter(Boolean).map(esc).join(' · ')}</small>`:''}</th>${res.map(x=>`<td><span class="cell ${x}" aria-label="${x==='land'?'Landed':x==='miss'?'Missed':x==='none'?'Not in run then':'Not tried'}">${x==='land'?'✓':x==='miss'?'✕':x==='none'?'–':'·'}</span></td>`).join('')}<td class="pct">${land}/${tried||0}</td></tr>`).join('')}</tbody></table></div>
     <span class="lbl">Tries</span>
     <div class="group">${tries.map((t,j)=>{const sc=runScore(t);return `<button class="ltr" data-try="${esc(t.id)}"><span class="n">Try ${tries.length-j}<span class="m">${esc(fmtDT(t.at))}</span><span class="marks" aria-hidden="true">${(t.items||[]).map(i=>`<i class="${esc(i.res||'')}"></i>`).join('')}</span></span><span class="lbl" style="color:var(--ink)">${sc.land}/${sc.total}</span></button>`}).join('')}</div>
-    <div class="row"><button class="btn" id="gnew">Start a new try</button><button class="btn ghost" id="gclose">Close</button></div>`,s=>{
+    <div class="row"><button class="btn" id="gnew">Start a new try</button><button class="btn ghost" id="gedit">Edit tricks</button></div>
+    <button class="btn ghost" id="gclose">Close</button>`,s=>{
     s.querySelector('#gclose').onclick=closeSheet;
+    s.querySelector('#gedit').onclick=()=>defSheet(latest,back);
     s.querySelector('#gnew').onclick=()=>newTryFrom(latest,back);
     s.addEventListener('click',e=>{const b=e.target.closest('[data-try]');if(b)runSheet(b.dataset.try,null,back)});
+  });
+}
+function defSheet(latest,back){
+  let def=defOf(latest);
+  if(!def){const defId='def-'+latest.id;def={id:defId,rider:latest.rider,name:latest.name||'Run',locId:latest.locId||'',items:stripItems(latest.items)}}
+  const d={name:def.name||'Run',locId:def.locId||'',items:stripItems(def.items)};
+  const myTricks=()=>state.tricks.filter(t=>t.rider===def.rider).sort((a,b)=>((b.locId===d.locId)-(a.locId===d.locId))||fullName(a).localeCompare(fullName(b)));
+  openSheet(`<h2>Edit run</h2>
+    <p class="note" style="margin:0">Changes apply to new tries. Past tries keep their results.</p>
+    <div class="field"><label class="lbl" for="dname">Name</label><input id="dname" value="${esc(d.name)}"></div>
+    <div class="field"><label class="lbl" for="dloc">Location</label><select id="dloc"><option value="">No location</option>${sortedLocs().map(l=>`<option value="${esc(l.id)}" ${l.id===d.locId?'selected':''}>${esc(l.name)}</option>`).join('')}</select></div>
+    <span class="lbl">Tricks, in order</span>
+    <div id="ditems" class="group"></div>
+    <div class="field"><label class="lbl" for="dadd">Add a trick</label><div class="row"><select id="dadd" style="flex:1;min-width:0"></select><button class="btn" id="daddBtn" style="flex:none">Add</button></div></div>
+    <div class="row"><button class="btn" id="dsave">Save</button><button class="btn ghost" id="dcancel">Cancel</button></div>`,s=>{
+    const draw=()=>{
+      const robs=obstaclesOf(d.locId);
+      const obsSel=(it,i)=>{const list=[...robs,...(it.obstacle&&!robs.includes(it.obstacle)?[it.obstacle]:[])];if(!list.length)return'';return `<select class="robs" data-oi="${i}" aria-label="Obstacle for ${esc(it.name)}"><option value="">No obstacle</option>${list.map(o=>`<option ${o===it.obstacle?'selected':''}>${esc(o)}</option>`).join('')}</select>`};
+      s.querySelector('#ditems').innerHTML=d.items.length?d.items.map((it,i)=>`<div class="ri"><span class="num">${i+1}</span><span class="n">${esc(it.name)}${obsSel(it,i)}</span>
+        <span class="mv"><button data-mv="${i}" data-d="-1" aria-label="Move ${esc(it.name)} up" ${i===0?'disabled':''}>▲</button><button data-mv="${i}" data-d="1" aria-label="Move ${esc(it.name)} down" ${i===d.items.length-1?'disabled':''}>▼</button></span>
+        <button class="rm" data-rm="${i}">Remove</button></div>`).join(''):'<div class="empty">No tricks in this run yet.</div>';
+      const list=myTricks();
+      s.querySelector('#dadd').innerHTML=list.length?list.map(t=>`<option value="${esc(t.id)}">${esc(fullName(t))}${t.obstacle?' · '+esc(t.obstacle):''}${t.locId&&t.locId!==d.locId&&locName(t.locId)?' @ '+esc(locName(t.locId)):''}</option>`).join(''):'<option value="">Add tricks to the trick list first</option>';
+    };
+    draw();
+    s.querySelector('#ditems').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+      if(b.dataset.rm!==undefined){d.items.splice(+b.dataset.rm,1);draw();return}
+      if(b.dataset.mv!==undefined){const i=+b.dataset.mv,j=i+(+b.dataset.d);if(j<0||j>=d.items.length)return;[d.items[i],d.items[j]]=[d.items[j],d.items[i]];draw()}};
+    s.querySelector('#ditems').addEventListener('change',e=>{const el=e.target.closest('select.robs');if(!el)return;const it=d.items[+el.dataset.oi];if(it)it.obstacle=el.value});
+    s.querySelector('#daddBtn').onclick=()=>{const t=state.tricks.find(x=>x.id===s.querySelector('#dadd').value);if(!t)return;d.items.push({tid:t.id,name:fullName(t),obstacle:t.locId===d.locId&&t.obstacle?t.obstacle:''});draw()};
+    s.querySelector('#dname').addEventListener('input',e=>{d.name=e.target.value});
+    s.querySelector('#dloc').addEventListener('change',e=>{d.locId=e.target.value;const ok=obstaclesOf(d.locId);d.items.forEach(it=>{if(it.obstacle&&!ok.includes(it.obstacle))it.obstacle=''});draw()});
+    s.querySelector('#dcancel').onclick=()=>{closeSheet();back&&back()};
+    s.querySelector('#dsave').onclick=()=>{
+      const {id,...rest}=def;
+      store.put('runDefs',def.id,{...rest,name:d.name.trim()||'Run',locId:d.locId,items:d.items,updated:Date.now()});
+      if(!latest.defId)groupOf(latest.id).forEach(t=>{const {id:tid,...r}=t;store.put('runs',tid,{...r,defId:def.id})});
+      toast('Run updated');closeSheet();back&&setTimeout(back,0);
+    };
   });
 }
 function runRow(r){
@@ -1028,15 +1093,21 @@ function runRow(r){
 function newRun(){
   const prev=state.runs.filter(r=>r.rider===ui.rider).sort((a,b)=>String(b.at).localeCompare(String(a.at)));
   const id=uid();
-  const data={rider:ui.rider,name:'Run '+(runGroups(ui.rider).length+1),locId:prev[0]?.locId||'',at:nowLocal(),items:[],created:Date.now(),updated:Date.now()};
+  const defId='def-'+id,name='Run '+(runGroups(ui.rider).length+1),locId=prev[0]?.locId||'';
+  store.put('runDefs',defId,{rider:ui.rider,name,locId,items:[],created:Date.now(),updated:Date.now()});
+  const data={rider:ui.rider,defId,name,locId,at:nowLocal(),items:[],created:Date.now(),updated:Date.now()};
   store.put('runs',id,data);runSheet(id,data);
 }
 function runSheet(id,initial,back){
   const src=initial||state.runs.find(r=>r.id===id);if(!src)return;
   const d=JSON.parse(JSON.stringify(src));delete d.id;d.items=d.items||[];
-  let confirmDel=false,timer=null,chain=Promise.resolve();
-  const flush=()=>{clearTimeout(timer);timer=null;d.updated=Date.now();const snap=JSON.parse(JSON.stringify(d));chain=chain.then(()=>store.put('runs',id,snap))};
+  let confirmDel=false,timer=null,chain=Promise.resolve(),structChanged=false;
+  const isLatest=()=>!state.runs.some(x=>x.id!==id&&x.rider===d.rider&&groupKey(x)===groupKey(d)&&String(x.at)>String(d.at));
+  const flush=()=>{clearTimeout(timer);timer=null;d.updated=Date.now();const snap=JSON.parse(JSON.stringify(d));chain=chain.then(()=>store.put('runs',id,snap));
+    if(structChanged&&d.defId&&isLatest()){const def=state.runDefs.find(x=>x.id===d.defId);const base=def?(({id:_,...r})=>r)(def):{rider:d.rider,created:Date.now()};
+      store.put('runDefs',d.defId,{...base,name:d.name,locId:d.locId,items:stripItems(d.items),updated:Date.now()});structChanged=false}};
   const save=()=>{clearTimeout(timer);timer=setTimeout(flush,400)};
+  const saveS=()=>{structChanged=true;save()};
   const myTricks=()=>state.tricks.filter(t=>t.rider===d.rider).sort((a,b)=>((b.locId===d.locId)-(a.locId===d.locId))||fullName(a).localeCompare(fullName(b))||String(a.obstacle||'').localeCompare(String(b.obstacle||'')));
   const who=esc(state.riders[d.rider]?.name||'they');
   openSheet(`<h2>Run</h2>
@@ -1047,7 +1118,7 @@ function runSheet(id,initial,back){
     <div id="ritems" class="group"></div>
     <div class="field"><label class="lbl" for="radd">Add a trick</label><div class="row"><select id="radd" style="flex:1;min-width:0"></select><button class="btn" id="raddBtn" style="flex:none">Add</button></div></div>
     <div class="row"><button class="btn" id="rdone">Done</button><button class="btn ghost" id="ragain">Try this run again</button></div>
-    <button class="btn danger" id="rdel">Delete run</button>`,s=>{
+    <button class="btn danger" id="rdel">Delete this try</button>`,s=>{
     const draw=()=>{
       const sc=runScore(d);
       s.querySelector('#rscore').textContent=d.items.length?`${sc.land} landed · ${sc.miss} missed`:'';
@@ -1063,19 +1134,21 @@ function runSheet(id,initial,back){
     };
     draw();
     s.querySelector('#ritems').onclick=e=>{const b=e.target.closest('button');if(!b)return;
-      if(b.dataset.rm!==undefined){d.items.splice(+b.dataset.rm,1);draw();save();return}
-      if(b.dataset.mv!==undefined){const i=+b.dataset.mv,j=i+(+b.dataset.d);if(j<0||j>=d.items.length)return;[d.items[i],d.items[j]]=[d.items[j],d.items[i]];draw();save();
+      if(b.dataset.rm!==undefined){d.items.splice(+b.dataset.rm,1);draw();saveS();return}
+      if(b.dataset.mv!==undefined){const i=+b.dataset.mv,j=i+(+b.dataset.d);if(j<0||j>=d.items.length)return;[d.items[i],d.items[j]]=[d.items[j],d.items[i]];draw();saveS();
         const nb=s.querySelector(`[data-mv="${j}"][data-d="${b.dataset.d}"]`)||s.querySelector(`[data-mv="${j}"]`);nb&&!nb.disabled&&nb.focus();return}
       const it=d.items[+b.dataset.i];if(!it)return;it.res=it.res===b.dataset.v?'':b.dataset.v;draw();save()};
     s.querySelector('#raddBtn').onclick=()=>{const t=state.tricks.find(x=>x.id===s.querySelector('#radd').value);if(!t)return;
-      d.items.push({tid:t.id,name:fullName(t),res:'',obstacle:t.locId===d.locId&&t.obstacle?t.obstacle:''});draw();save()};
-    s.querySelector('#ritems').addEventListener('change',e=>{const el=e.target.closest('select.robs');if(!el)return;const it=d.items[+el.dataset.oi];if(it){it.obstacle=el.value;save()}});
-    s.querySelector('#rname').addEventListener('input',e=>{d.name=e.target.value;save()});
+      d.items.push({tid:t.id,name:fullName(t),res:'',obstacle:t.locId===d.locId&&t.obstacle?t.obstacle:''});draw();saveS()};
+    s.querySelector('#ritems').addEventListener('change',e=>{const el=e.target.closest('select.robs');if(!el)return;const it=d.items[+el.dataset.oi];if(it){it.obstacle=el.value;saveS()}});
+    s.querySelector('#rname').addEventListener('input',e=>{d.name=e.target.value;saveS()});
     s.querySelector('#rat').addEventListener('change',e=>{d.at=e.target.value;save()});
-    s.querySelector('#rloc').addEventListener('change',e=>{d.locId=e.target.value;const ok=obstaclesOf(d.locId);d.items.forEach(it=>{if(it.obstacle&&!ok.includes(it.obstacle))it.obstacle=''});draw();save()});
+    s.querySelector('#rloc').addEventListener('change',e=>{d.locId=e.target.value;const ok=obstaclesOf(d.locId);d.items.forEach(it=>{if(it.obstacle&&!ok.includes(it.obstacle))it.obstacle=''});draw();saveS()});
     s.querySelector('#rdone').onclick=()=>{closeSheet();if(back)back()};
-    s.querySelector('#ragain').onclick=()=>{if(timer)flush();const nid=uid();const nd={...JSON.parse(JSON.stringify(d)),at:nowLocal(),items:d.items.map(i=>({tid:i.tid,name:i.name,res:'',obstacle:i.obstacle||''})),created:Date.now(),updated:Date.now()};sheetOnClose=null;chain.then(()=>store.put('runs',nid,nd));runSheet(nid,nd,back||(()=>runGroupSheet(nid)));toast('New try started')};
-    s.querySelector('#rdel').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}clearTimeout(timer);timer=null;sheetOnClose=null;chain.then(()=>store.del('runs',id));closeSheet();toast('Run deleted')};
+    s.querySelector('#ragain').onclick=()=>{if(timer)flush();const def=d.defId&&state.runDefs.find(x=>x.id===d.defId);const srcItems=structChanged||!def?d.items:def.items;
+      const nid=uid();const nd={...JSON.parse(JSON.stringify(d)),name:def&&!structChanged?def.name:d.name,locId:def&&!structChanged?(def.locId||''):d.locId,at:nowLocal(),items:(srcItems||[]).map(i=>({tid:i.tid,name:i.name,res:'',obstacle:i.obstacle||''})),created:Date.now(),updated:Date.now()};
+      sheetOnClose=null;chain.then(()=>store.put('runs',nid,nd));runSheet(nid,nd,back||(()=>runGroupSheet(nid)));toast('New try started')};
+    s.querySelector('#rdel').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}clearTimeout(timer);timer=null;sheetOnClose=null;chain.then(()=>store.del('runs',id));closeSheet();toast('Try deleted');if(back)setTimeout(()=>{const g=state.runs.filter(x=>x.id!==id&&x.rider===d.rider&&groupKey(x)===groupKey(d));if(g.length)back()},300)};
   });
   sheetOnClose=()=>{if(timer)flush()};
 }
