@@ -140,6 +140,12 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .lsk{display:flex;align-items:center;gap:10px;margin-top:6px}
 .lsk .av{width:34px;height:34px;font-size:15px}
 .lsk h3{margin:0;font-family:var(--display);font-weight:400;font-size:18px}
+.spot{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:8px}
+.spot select{flex:1 1 140px;min-width:0;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:9px 10px}
+.spot .rm{border:0;background:none;color:var(--muted);font-size:13px;padding:4px 6px}
+.ochip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:5px 6px 5px 12px;font-size:14px;font-weight:600}
+.ochip small{font-family:var(--label);color:var(--muted)}
+.ochip button{border:0;background:var(--line);color:var(--ink);width:24px;height:24px;border-radius:50%;padding:0;line-height:1;font-size:15px}
 .ltr{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;text-align:left;width:100%}
 .ltr .n{flex:1;min-width:0;font-weight:700;overflow-wrap:anywhere}
 .ltr .m{display:block;font-weight:400;font-size:14px;color:var(--muted)}
@@ -271,7 +277,12 @@ const STAIR_TRICKS=[...GAP_TRICKS,'50-50 handrail','Boardslide handrail','Lipsli
 CATS['Death Gap']=GAP_TRICKS;
 ['2 Stair','3 Stair','5 Stair','6 Stair','7 Stair','Street Stairs'].forEach(k=>CATS[k]=STAIR_TRICKS);
 const CAT_NAMES=Object.keys(CATS);
-const locIdsOf=t=>Array.isArray(t.locIds)?t.locIds:(t.locId?[t.locId]:[]);
+const OBSTACLES=['Bank','Bowl','Box','Coping','Curb','Euro gap','Flat bar','Funbox','Gap','Handrail','Hip','Hubba','Kicker','Ledge','Manual pad','Mini ramp','Pyramid','Quarter pipe','Rail','Stairs','Wall'];
+const oldLocIds=t=>Array.isArray(t.locIds)?t.locIds:(t.locId?[t.locId]:[]);
+const spotsOf=t=>Array.isArray(t.spots)?t.spots:oldLocIds(t).map(id=>({locId:id,obstacle:''}));
+const locIdsOf=t=>[...new Set(spotsOf(t).map(sp=>sp.locId).filter(Boolean))];
+const locName=id=>state.locations.find(l=>l.id===id)?.name||'';
+const obstaclesOf=id=>{const l=state.locations.find(x=>x.id===id);return Array.isArray(l?.obstacles)?l.obstacles:[]};
 const fullName=t=>t.stance&&t.stance!=='Regular'&&!t.name.toLowerCase().startsWith(t.stance.toLowerCase())?t.stance+' '+t.name.charAt(0).toLowerCase()+t.name.slice(1):t.name;
 
 let state={riders:{a:{name:'Skater 1'},b:{name:'Skater 2'}},tricks:[],goals:[],locations:[],runs:[]};
@@ -440,7 +451,7 @@ function render(){
 }
 function trickRow(t){
   const i=SIDX[t.status]??0;
-  const lnames=locIdsOf(t).map(id=>state.locations.find(l=>l.id===id)?.name).filter(Boolean);
+  const lnames=spotsOf(t).filter(sp=>locName(sp.locId)).map(sp=>locName(sp.locId)+(sp.obstacle?' ('+sp.obstacle+')':''));
   const meta=[t.cat||'',lnames.length?'at '+lnames.join(', '):'',t.landedAt?'First landed '+fmtDate(t.landedAt):''].filter(Boolean).join(' · ');
   const next=STATUSES[i+1];
   return `<div class="trick">
@@ -535,23 +546,36 @@ function addTrick(name,cat){
 
 function editTrick(id){
   const t=state.tricks.find(x=>x.id===id);if(!t)return;
-  let st=t.status,confirmDel=false;const locSel=new Set(locIdsOf(t));
+  let st=t.status,confirmDel=false;let spots=spotsOf(t).filter(sp=>locName(sp.locId)).map(sp=>({locId:sp.locId,obstacle:sp.obstacle||''}));
   openSheet(`<h2>${esc(fullName(t))}</h2>
     <div class="field"><span class="lbl">Where it's at</span><div class="seg" id="st">${STATUSES.map(s=>`<button data-s="${s.k}">${s.label}</button>`).join('')}</div></div>
     <div class="field"><label class="lbl" for="tname">Name</label><input id="tname" value="${esc(fullName(t))}"></div>
     <div class="field"><label class="lbl" for="tcat">Type</label><select id="tcat">${CAT_NAMES.map(c=>`<option ${c===t.cat?'selected':''}>${esc(c)}</option>`).join('')}<option value="" ${t.cat&&!CAT_NAMES.includes(t.cat)?'':(!t.cat?'selected':'')}>Other</option></select></div>
-    <div class="field"><span class="lbl" id="tlocL">Locations</span><div class="filters" id="tloc" role="group" aria-labelledby="tlocL" style="flex-wrap:wrap">${sortedLocs().map(l=>`<button class="chip" data-l="${esc(l.id)}" aria-pressed="${locIdsOf(t).includes(l.id)}">${esc(l.name)}</button>`).join('')}</div>${state.locations.length?'<span class="note">Tap every spot where this trick has been done.</span>':'<span class="note">Add spots in the Locations section to pick them here.</span>'}</div>
+    <div class="field"><span class="lbl">Location &amp; obstacle</span><div id="tspots" class="group"></div>
+      ${state.locations.length?'<button class="btn ghost" id="addSpot">+ Add a location</button>':'<span class="note">Add spots in the Locations section to pick them here.</span>'}</div>
     <div class="field"><label class="lbl" for="tland">First landed</label><input id="tland" type="date" value="${esc(t.landedAt||'')}"></div>
     <div class="field"><label class="lbl" for="tnotes">Notes</label><textarea id="tnotes" placeholder="Where, how it felt, what to fix next">${esc(t.notes||'')}</textarea></div>
     <div class="row"><button class="btn" id="save">Save</button><button class="btn ghost" id="cancel">Cancel</button></div>
     <button class="btn danger" id="del">Delete trick</button>`,s=>{
     const mark=()=>{s.querySelectorAll('#st button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.s===st))};mark();
     s.querySelector('#st').onclick=e=>{const b=e.target.closest('[data-s]');if(b){st=b.dataset.s;if(SIDX[st]>=2&&!s.querySelector('#tland').value)s.querySelector('#tland').value=today();mark()}};
-    s.querySelector('#tloc').onclick=e=>{const b=e.target.closest('[data-l]');if(!b)return;const id=b.dataset.l;locSel.has(id)?locSel.delete(id):locSel.add(id);b.setAttribute('aria-pressed',locSel.has(id))};
+    const drawSpots=()=>{
+      const locs=sortedLocs();
+      s.querySelector('#tspots').innerHTML=spots.map((sp,i)=>{const obs=obstaclesOf(sp.locId);const extra=sp.obstacle&&!obs.includes(sp.obstacle)?[sp.obstacle]:[];
+        return `<div class="spot"><select data-i="${i}" data-k="loc" aria-label="Location">${locs.map(l=>`<option value="${esc(l.id)}" ${l.id===sp.locId?'selected':''}>${esc(l.name)}</option>`).join('')}</select>
+        <select data-i="${i}" data-k="obs" aria-label="Obstacle" ${obs.length||extra.length?'':'disabled'}><option value="">${obs.length||extra.length?'No obstacle':'No obstacles set here'}</option>${[...obs,...extra].map(o=>`<option ${o===sp.obstacle?'selected':''}>${esc(o)}</option>`).join('')}</select>
+        <button class="rm" data-rmspot="${i}">Remove</button></div>`}).join('')||'<span class="note">No location yet.</span>';
+    };
+    drawSpots();
+    s.querySelector('#tspots').addEventListener('change',e=>{const el=e.target.closest('select');if(!el)return;const sp=spots[+el.dataset.i];if(!sp)return;
+      if(el.dataset.k==='loc'){sp.locId=el.value;if(!obstaclesOf(sp.locId).includes(sp.obstacle))sp.obstacle='';drawSpots()}else sp.obstacle=el.value});
+    s.querySelector('#tspots').addEventListener('click',e=>{const b=e.target.closest('[data-rmspot]');if(b){spots.splice(+b.dataset.rmspot,1);drawSpots()}});
+    const addBtn=s.querySelector('#addSpot');
+    if(addBtn)addBtn.onclick=()=>{const locs=sortedLocs();const used=new Set(spots.map(x=>x.locId));const l=locs.find(x=>!used.has(x.id))||locs[0];if(l){spots.push({locId:l.id,obstacle:''});drawSpots()}};
     s.querySelector('#cancel').onclick=closeSheet;
     s.querySelector('#save').onclick=()=>{
       const {id:_,...rest}=t;
-      store.put('tricks',t.id,{...rest,name:s.querySelector('#tname').value.trim()||fullName(t),cat:s.querySelector('#tcat').value,stance:'',locId:'',locIds:[...locSel],status:st,landedAt:s.querySelector('#tland').value||'',notes:s.querySelector('#tnotes').value.trim(),updated:Date.now()});
+      store.put('tricks',t.id,{...rest,name:s.querySelector('#tname').value.trim()||fullName(t),cat:s.querySelector('#tcat').value,stance:'',locId:'',spots:spots.filter(sp=>sp.locId),locIds:[...new Set(spots.map(sp=>sp.locId).filter(Boolean))],status:st,landedAt:s.querySelector('#tland').value||'',notes:s.querySelector('#tnotes').value.trim(),updated:Date.now()});
       closeSheet();
     };
     s.querySelector('#del').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('tricks',t.id);closeSheet();toast('Trick deleted')};
@@ -662,15 +686,26 @@ function locSheet(id){
     const av=rd.photo?`<img src="${esc(rd.photo)}" alt="">`:esc((rd.name.trim()[0]||'?').toUpperCase());
     const landed=ts.filter(t=>SIDX[t.status]>=2).length;
     return `<div class="lsk"><span class="av av-${k}">${av}</span><h3>${esc(rd.name)}</h3><span class="lbl">${landed} of ${ts.length} landed here</span></div>
-      ${ts.length?`<span class="lbl">Tricks</span>`+ts.map(t=>{const S=STATUSES[SIDX[t.status]??0];return `<button class="ltr" data-edit="${esc(t.id)}"><span class="n">${esc(fullName(t))}${t.cat?`<span class="m">${esc(t.cat)}</span>`:''}</span><span class="tag s-${esc(t.status)}">${S.short}</span></button>`}).join(''):''}
+      ${ts.length?`<span class="lbl">Tricks</span>`+ts.map(t=>{const S=STATUSES[SIDX[t.status]??0];const ob=spotsOf(t).filter(sp=>sp.locId===id&&sp.obstacle).map(sp=>sp.obstacle);const m=[t.cat||'',ob.length?'on '+ob.join(', '):''].filter(Boolean).join(' · ');return `<button class="ltr" data-edit="${esc(t.id)}"><span class="n">${esc(fullName(t))}${m?`<span class="m">${esc(m)}</span>`:''}</span><span class="tag s-${esc(t.status)}">${S.short}</span></button>`}).join(''):''}
       ${rs.length?`<span class="lbl">Runs</span>`+rs.map(r=>{const sc=runScore(r);return `<button class="ltr" data-run="${esc(r.id)}"><span class="n">${esc(r.name||'Run')}<span class="m">${esc(fmtDT(r.at))}</span></span><span class="lbl" style="color:var(--ink)">${sc.land}/${sc.total} landed</span></button>`}).join(''):''}`;
   };
   const body=part('a')+part('b');
   openSheet(`<h2>${esc(l.name)}</h2>
+    <div class="field"><label class="lbl" for="lobsIn">Obstacles here</label><div class="lib" id="lobs"></div>
+      <div class="row"><input id="lobsIn" list="obsList" placeholder="e.g. Hubba, flat bar, 5 stair rail" autocomplete="off" style="flex:1"><button class="btn" id="lobsAdd" style="flex:none">Add</button></div>
+      <datalist id="obsList">${OBSTACLES.map(o=>`<option value="${esc(o)}"></option>`).join('')}</datalist></div>
     <p class="note" style="margin:0">${tricks.length} trick${tricks.length===1?'':'s'} and ${runs.length} run${runs.length===1?'':'s'} at this spot. Tap one to open it.</p>
     ${body||'<div class="empty">Nothing here yet. Pick this location on a trick or a run and it will show up here.</div>'}
     <button class="btn ghost" id="lclose">Close</button>`,s=>{
     s.querySelector('#lclose').onclick=closeSheet;
+    let obs=[...obstaclesOf(id)];
+    const saveObs=()=>{const cur=state.locations.find(x=>x.id===id)||l;const {id:_,...rest}=cur;store.put('locations',id,{...rest,obstacles:obs})};
+    const drawObs=()=>{s.querySelector('#lobs').innerHTML=obs.length?obs.map((o,i)=>{const n=state.tricks.filter(t=>spotsOf(t).some(sp=>sp.locId===id&&sp.obstacle===o)).length;return `<span class="ochip">${esc(o)}${n?` <small>${n}</small>`:''}<button data-orm="${i}" aria-label="Remove ${esc(o)}">×</button></span>`}).join(''):'<span class="note">No obstacles yet. Add the rails, ledges and ramps at this spot so you can pick them on tricks.</span>'};
+    drawObs();
+    const addObs=()=>{const inp=s.querySelector('#lobsIn');const v=inp.value.trim();if(!v)return;if(obs.some(o=>o.toLowerCase()===v.toLowerCase())){toast(`${v} is already here`);return}obs.push(v);inp.value='';drawObs();saveObs()};
+    s.querySelector('#lobsAdd').onclick=addObs;
+    s.querySelector('#lobsIn').addEventListener('keydown',e=>{if(e.key==='Enter')addObs()});
+    s.querySelector('#lobs').addEventListener('click',e=>{const b=e.target.closest('[data-orm]');if(!b)return;obs.splice(+b.dataset.orm,1);drawObs();saveObs()});
     s.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.edit)editTrick(b.dataset.edit);else if(b.dataset.run)runSheet(b.dataset.run)});
   });
 }
