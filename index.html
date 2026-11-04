@@ -255,6 +255,9 @@ body.is-dragging .handle{cursor:grabbing}
 .field textarea{min-height:70px;resize:vertical}
 .lib{display:flex;flex-wrap:wrap;gap:6px}
 .lib button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:7px 11px;font-size:14px;font-weight:600}
+.wrapchips{flex-wrap:wrap;overflow:visible}
+.lib.waiting button{opacity:.55}
+.warnnote{margin:0;color:var(--warn);font-weight:600}
 .lib button.have{opacity:.4;text-decoration:line-through}
 .lib button.custom{border-style:dashed;border-color:var(--muted)}
 .row{display:flex;gap:8px;flex-wrap:wrap}
@@ -711,16 +714,18 @@ function trickSheet(preset){
     const shownBase=base.map(full);
     const btn=(n,extra)=>`<button data-n="${esc(n)}" class="${have.has(wk(n))?'have':''} ${extra||''}">${esc(n)}</button>`;
     const w=where?where.get():{};
-    if(!w.locId||!w.obstacle){s.querySelector('#lib').innerHTML=`<span class="note">${w.locId?'Choose an obstacle above, then tap tricks to add them.':'Add a location first, then come back here.'}</span>`;return}
+    const hint=s.querySelector('#libHint');if(hint){hint.hidden=!!(w.locId&&w.obstacle);hint.textContent=w.locId?'Choose an obstacle above before adding tricks.':'Add a location first, then come back here.'}
+    s.querySelector('#lib').classList.toggle('waiting',!(w.locId&&w.obstacle));
     s.querySelector('#lib').innerHTML=shownBase.map(n=>btn(n)).join('')+customShown.filter(n=>!shownBase.some(b=>b.toLowerCase()===n.toLowerCase())).map(n=>btn(n,'custom')).join('');
   };
   openSheet(`<h2>Add tricks</h2>
     <div class="seg" id="arider" role="group" aria-label="Skater">${['a','b'].map(k=>`<button data-k="${k}">${esc(state.riders[k]?.name||'Skater')}</button>`).join('')}</div>
     <p class="note" style="margin:0">Pick where, then tap tricks to add them to the wishlist. Each trick on each obstacle tracks its own progress.</p>
     <div id="where"></div>
-    <div class="filters" id="cats"></div>
+    <div class="field"><span class="lbl">Type of trick</span><div class="filters wrapchips" id="cats"></div></div>
     <div class="seg seg4" id="stc" role="group" aria-label="Stance">${STANCES.map(s=>`<button data-s="${s}">${s}</button>`).join('')}</div>
     <div class="seg seg3" id="sdc" role="group" aria-label="Frontside or backside" hidden>${['Plain','Frontside','Backside'].map(d=>`<button data-d="${d}">${d==='Plain'?'No side':d}</button>`).join('')}</div>
+    <p class="note warnnote" id="libHint" hidden></p>
     <div class="lib" id="lib"></div>
     <div class="field"><label class="lbl" for="own">Or type your own</label>
       <div class="row"><input id="own" placeholder="e.g. Kickflip to fakie" autocomplete="off" style="flex:1"><button class="btn" id="ownAdd" style="flex:none">Add</button></div></div>
@@ -732,7 +737,7 @@ function trickSheet(preset){
     s.querySelector('#cats').onclick=e=>{const b=e.target.closest('[data-c]');if(b){cat=b.dataset.c;draw(s)}};
     s.querySelector('#stc').onclick=e=>{const b=e.target.closest('[data-s]');if(b){stance=b.dataset.s;draw(s)}};
     s.querySelector('#sdc').onclick=e=>{const b=e.target.closest('[data-d]');if(b){side=b.dataset.d;draw(s)}};
-    s.querySelector('#lib').onclick=e=>{const b=e.target.closest('[data-n]');const w=where.get();if(!b||!w.obstacle||have.has(wk(b.dataset.n)))return;addTrick(b.dataset.n,cat,w.locId,w.obstacle,rider);have.add(wk(b.dataset.n));draw(s)};
+    s.querySelector('#lib').onclick=e=>{const b=e.target.closest('[data-n]');const w=where.get();if(b&&!w.obstacle){toast(w.locId?'Choose an obstacle first':'Add a location first');const o=s.querySelector('#wobs');if(o){o.focus();o.scrollIntoView({block:'center'})}return}if(!b||have.has(wk(b.dataset.n)))return;addTrick(b.dataset.n,cat,w.locId,w.obstacle,rider);have.add(wk(b.dataset.n));draw(s)};
     const own=s.querySelector('#own');
     const addOwn=()=>{const v=own.value.trim();if(!v)return;const w=where.get();if(!w.locId||!w.obstacle){toast('Pick a location and an obstacle first');return}if(have.has(wk(v))){toast(`${v} is already on the list there`);return}addTrick(v,cat,w.locId,w.obstacle,rider);have.add(wk(v));own.value='';draw(s)};
     s.querySelector('#ownAdd').onclick=addOwn;own.addEventListener('keydown',e=>{if(e.key==='Enter')addOwn()});
