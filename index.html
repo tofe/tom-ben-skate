@@ -211,6 +211,20 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .ri .mv button{width:30px;height:21px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;font-size:10px;line-height:1;padding:0}
 .ri .mv button:disabled{opacity:.3}
 .ri .rm{flex:none;border:0;background:none;color:var(--muted);font-size:13px;padding:4px 2px}
+.handle{flex:none;touch-action:none;cursor:grab;border:0;background:none;color:var(--muted);padding:8px 6px;margin:-8px -4px;display:grid;place-items:center;border-radius:8px}
+.handle:hover{color:var(--ink)}
+.hsec>.sh{justify-content:flex-start}
+.hsec>.sh>.lbl{margin-left:auto}
+.hsec>.sh>.handle{margin-left:4px}
+.hsec>.sh>h2+.handle{margin-left:auto}
+.loc .handle{margin-left:-8px}
+.dragging{position:relative;z-index:25;box-shadow:0 12px 32px rgba(0,0,0,.28);cursor:grabbing}
+.goal.dragging,.loc.dragging{background:var(--surface)}
+body.is-dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
+body.is-dragging .handle{cursor:grabbing}
+#app.arranging .hsec>:not(.sh){display:none}
+#app.arranging .hsec{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+@media (prefers-reduced-motion:no-preference){.goal,.loc{transition:box-shadow .15s}}
 .btn{border:0;border-radius:12px;padding:12px 16px;font-weight:700;background:var(--rider);color:#fff}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
 .btn.danger{background:transparent;color:var(--b);border:1px solid var(--b)}
@@ -268,38 +282,38 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
   <div class="strip" id="strip"></div>
   <div class="ladder" id="ladder" aria-hidden="true"></div>
 
-  <section class="hsec" data-sec="goals">
-    <div class="sh"><h2>Goals</h2><span class="lbl" id="goalCount"></span></div>
+  <section class="hsec" data-sec="goals" data-sortitem="sec" data-key="goals">
+    <div class="sh"><h2>Goals</h2><span class="lbl" id="goalCount"></span><button class="handle" data-drag aria-label="Drag to move Goals"><svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><g fill="currentColor"><circle cx="2" cy="2" r="1.6"/><circle cx="8" cy="2" r="1.6"/><circle cx="2" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="2" cy="14" r="1.6"/><circle cx="8" cy="14" r="1.6"/></g></svg></button></div>
     <div id="goals" class="group"></div>
   </section>
 
-  <section class="hsec" data-sec="locations">
-    <div class="sh"><h2>Locations</h2><span class="lbl" id="locCount"></span></div>
+  <section class="hsec" data-sec="locations" data-sortitem="sec" data-key="locations">
+    <div class="sh"><h2>Locations</h2><span class="lbl" id="locCount"></span><button class="handle" data-drag aria-label="Drag to move Locations"><svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><g fill="currentColor"><circle cx="2" cy="2" r="1.6"/><circle cx="8" cy="2" r="1.6"/><circle cx="2" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="2" cy="14" r="1.6"/><circle cx="8" cy="14" r="1.6"/></g></svg></button></div>
     <div class="field"><label class="lbl" for="newLoc">Add a skatepark or spot</label>
       <div class="row"><input id="newLoc" placeholder="e.g. Local skatepark, school stairs" autocomplete="off" style="flex:1"><button class="btn" id="addLoc" style="flex:none">Add</button></div></div>
     <div id="locs" class="group"></div>
   </section>
 
-  <section class="hsec" data-sec="tricks">
-    <div class="sh" style="align-items:center"><h2>Tricks</h2><span class="lbl" id="trickCount"></span></div>
+  <section class="hsec" data-sec="tricks" data-sortitem="sec" data-key="tricks">
+    <div class="sh" style="align-items:center"><h2>Tricks</h2><span class="lbl" id="trickCount"></span><button class="handle" data-drag aria-label="Drag to move Tricks"><svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><g fill="currentColor"><circle cx="2" cy="2" r="1.6"/><circle cx="8" cy="2" r="1.6"/><circle cx="2" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="2" cy="14" r="1.6"/><circle cx="8" cy="14" r="1.6"/></g></svg></button></div>
     <div class="filters" id="locfilters" aria-label="Filter by location"></div>
     <div class="filters" id="filters"></div>
     <div id="tricks"></div>
   </section>
 
-  <section class="hsec" data-sec="runs">
-    <div class="sh"><h2>Runs</h2><span class="lbl" id="runCount"></span></div>
+  <section class="hsec" data-sec="runs" data-sortitem="sec" data-key="runs">
+    <div class="sh"><h2>Runs</h2><span class="lbl" id="runCount"></span><button class="handle" data-drag aria-label="Drag to move Runs"><svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><g fill="currentColor"><circle cx="2" cy="2" r="1.6"/><circle cx="8" cy="2" r="1.6"/><circle cx="2" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="2" cy="14" r="1.6"/><circle cx="8" cy="14" r="1.6"/></g></svg></button></div>
     <div id="runs" class="group"></div>
   </section>
 
 
-  <section class="hsec" data-sec="decks">
-    <div class="sh"><h2>Decks</h2><span class="lbl" id="boardCount"></span></div>
+  <section class="hsec" data-sec="decks" data-sortitem="sec" data-key="decks">
+    <div class="sh"><h2>Decks</h2><span class="lbl" id="boardCount"></span><button class="handle" data-drag aria-label="Drag to move Decks"><svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><g fill="currentColor"><circle cx="2" cy="2" r="1.6"/><circle cx="8" cy="2" r="1.6"/><circle cx="2" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="2" cy="14" r="1.6"/><circle cx="8" cy="14" r="1.6"/></g></svg></button></div>
     <div id="boards" class="group"></div>
   </section>
 
-  <section class="hsec" data-sec="shoes">
-    <div class="sh"><h2>Shoes</h2><span class="lbl" id="shoeCount"></span></div>
+  <section class="hsec" data-sec="shoes" data-sortitem="sec" data-key="shoes">
+    <div class="sh"><h2>Shoes</h2><span class="lbl" id="shoeCount"></span><button class="handle" data-drag aria-label="Drag to move Shoes"><svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><g fill="currentColor"><circle cx="2" cy="2" r="1.6"/><circle cx="8" cy="2" r="1.6"/><circle cx="2" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="2" cy="14" r="1.6"/><circle cx="8" cy="14" r="1.6"/></g></svg></button></div>
     <div id="shoes" class="group"></div>
   </section>
 
@@ -344,6 +358,7 @@ const fullName=t=>t.stance&&t.stance!=='Regular'&&!t.name.toLowerCase().startsWi
 
 let state={riders:{a:{name:'Skater 1'},b:{name:'Skater 2'}},tricks:[],goals:[],locations:[],runs:[],boards:[],shoes:[],runDefs:[]};
 let sheetOnClose=null;
+const GRIP='<svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><g fill="currentColor"><circle cx="2" cy="2" r="1.6"/><circle cx="8" cy="2" r="1.6"/><circle cx="2" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="2" cy="14" r="1.6"/><circle cx="8" cy="14" r="1.6"/></g></svg>';
 const SECTIONS=[['goals','Goals'],['locations','Locations'],['tricks','Tricks'],['runs','Runs'],['decks','Decks'],['shoes','Shoes']];
 let layout=null;try{const l=JSON.parse(localStorage.getItem('skate-layout')||'null');if(Array.isArray(l))layout=l}catch(e){}
 function sectionOrder(){const known=SECTIONS.map(x=>x[0]);const o=(layout||[]).filter(k=>known.includes(k));known.forEach(k=>{if(!o.includes(k))o.push(k)});return o}
@@ -489,7 +504,9 @@ async function importData(file){
 }
 
 /* ---------- render ---------- */
+let drag=null,renderWaiting=false;
 function render(){
+  if(drag&&drag.group!=='sec'){renderWaiting=true;return}
   document.body.classList.toggle('rb',ui.rider==='b');
   const R=ui.rider;
   const mine=state.tricks.filter(t=>t.rider===R);
@@ -545,7 +562,8 @@ function render(){
   $('#runs').innerHTML=runs.length?groups.map(runGroupRow).join('')+`<button class="btn ghost" data-act="new-run" style="width:100%">+ New run</button>`:`<div class="empty">No runs yet for ${name}.<br>Build a run from their tricks, then tick each one landed or missed.<br><button class="btn" data-act="new-run">Start a run</button></div>`;
 
   $('#goalCount').textContent=goals.length?`${gDone} of ${goals.length} done`:'';
-  const gs=goals.slice().sort((a,b)=>(a.done-b.done)||((a.due||'9')<(b.due||'9')?-1:1));
+  const ord=x=>typeof x.order==='number'?x.order:1e9;
+  const gs=goals.slice().sort((a,b)=>(a.done-b.done)||(ord(a)-ord(b))||((a.due||'9')<(b.due||'9')?-1:1));
   $('#goals').innerHTML=gs.length?gs.map(goalRow).join('')+`<button class="btn ghost" data-act="add-goal" style="width:100%">+ Add a goal</button>`:`<div class="empty">No goals for ${name} yet.<br>Try “Land a kickflip by the holidays” or “Drop in on the big bowl”.<br><button class="btn" data-act="add-goal">Set a goal</button></div>`;
 
   const locs=sortedLocs();
@@ -568,7 +586,7 @@ function render(){
   const visLocs=locs.filter(l=>!l.hidden),hidLocs=locs.filter(l=>l.hidden);
   $('#locCount').textContent=locs.length?`${visLocs.length} spot${visLocs.length===1?'':'s'}${hidLocs.length?` · ${hidLocs.length} hidden`:''}`:'';
   const locRow=l=>{const nt=state.tricks.filter(t=>t.locId===l.id).length,nr=state.runs.filter(r=>r.locId===l.id).length;const no=obstaclesOf(l.id).length;const armed=pendingLocDel===l.id;
-    return `<div class="loc ${l.hidden?'hiddenloc':''}"><button class="ln locopen" data-loc="${esc(l.id)}">${esc(l.name)}<span class="lc">${nt} trick${nt===1?'':'s'} · ${nr} run${nr===1?'':'s'} · ${no} obstacle${no===1?'':'s'} ›</span></button>
+    return `<div class="loc ${l.hidden?'hiddenloc':''}" ${l.hidden?'':`data-sortitem="loc" data-key="${esc(l.id)}"`}>${l.hidden?'':`<button class="handle" data-drag aria-label="Drag to move ${esc(l.name)}">${GRIP}</button>`}<button class="ln locopen" data-loc="${esc(l.id)}">${esc(l.name)}<span class="lc">${nt} trick${nt===1?'':'s'} · ${nr} run${nr===1?'':'s'} · ${no} obstacle${no===1?'':'s'} ›</span></button>
       <button class="x" data-lhide="${esc(l.id)}">${l.hidden?'Show':'Hide'}</button>${l.hidden?`<button class="x ${armed?'armed':''}" data-ldel="${esc(l.id)}">${armed?'Tap to delete':'Delete'}</button>`:''}</div>`};
   $('#locs').innerHTML=locs.length?(visLocs.map(locRow).join('')||'<div class="empty" style="padding:12px">All spots are hidden.</div>')
     +(hidLocs.length?`<button class="btn ghost" data-act="toggle-hidden" style="width:100%">${ui.showHidden?'Hide hidden spots':`Show ${hidLocs.length} hidden spot${hidLocs.length===1?'':'s'}`}</button>`+(ui.showHidden?hidLocs.map(locRow).join(''):''):'')
@@ -604,10 +622,10 @@ function goalRow(g){
   let when='';
   if(g.done)when='Done '+fmtDate(g.doneAt);
   else if(g.due){const d=daysTo(g.due);when=d<0?`<span class="late">${-d} day${d===-1?'':'s'} past ${fmtDate(g.due)}</span>`:d===0?'Due today':`By ${fmtDate(g.due)} · ${d} day${d===1?'':'s'} left`}
-  return `<div class="goal ${g.done?'done':''}">
+  return `<div class="goal ${g.done?'done':''}" ${g.done?'':`data-sortitem="goal" data-key="${esc(g.id)}"`}>
     <button class="chk" data-done="${g.id}" aria-label="${g.done?'Mark not done':'Mark done'}">${g.done?'✓':''}</button>
     <div class="t"><div class="gt">${esc(goalLabel(g))}</div>${when?`<div class="gm">${when}</div>`:''}</div>
-    <button class="x" data-gedit="${g.id}">Edit</button>
+    <button class="x" data-gedit="${g.id}">Edit</button>${g.done?'':`<button class="handle" data-drag aria-label="Drag to move this goal">${GRIP}</button>`}
   </div>`;
 }
 
@@ -1017,7 +1035,7 @@ function shoeSheet(id){
     if(x)s.querySelector('#sdel').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('shoes',x.id);closeSheet();toast('Shoes deleted')};
   });
 }
-function sortedLocs(){return state.locations.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)))}
+function sortedLocs(){const o=x=>typeof x.order==='number'?x.order:1e9;return state.locations.slice().sort((a,b)=>(o(a)-o(b))||String(a.name).localeCompare(String(b.name)))}
 function addLoc(){
   const i=$('#newLoc');const v=i.value.trim();if(!v){i.focus();return}
   if(state.locations.some(l=>String(l.name).toLowerCase()===v.toLowerCase())){toast(`${v} is already on the list`);return}
@@ -1202,6 +1220,54 @@ function runSheet(id,initial,back){
   });
   sheetOnClose=()=>{if(timer)flush()};
 }
+
+/* ---------- drag to reorder (touch and mouse) ---------- */
+function dragKeys(box,group){return [...box.children].filter(x=>x.dataset.sortitem===group).map(x=>x.dataset.key)}
+function dragPlace(){
+  const {item,box,group,y,grab}=drag;
+  item.style.transform='';
+  const sibs=[...box.children].filter(x=>x.dataset.sortitem===group&&x!==item);
+  const mid=y-grab+item.offsetHeight/2;
+  const before=sibs.find(x=>{const r=x.getBoundingClientRect();return mid<r.top+r.height/2});
+  if(before){if(item.nextElementSibling!==before)box.insertBefore(item,before)}
+  else if(sibs.length){const last=sibs[sibs.length-1];if(last.nextElementSibling!==item)last.after(item)}
+  item.style.transform=`translateY(${y-grab-item.getBoundingClientRect().top}px)`;
+}
+function dragTick(){
+  if(!drag)return;
+  const edge=70,y=drag.y,h=window.innerHeight;let v=0;
+  if(y<edge)v=-Math.ceil((edge-y)/5);else if(y>h-edge)v=Math.ceil((y-(h-edge))/5);
+  if(v){window.scrollBy(0,v);dragPlace()}
+  drag.raf=requestAnimationFrame(dragTick);
+}
+document.addEventListener('pointerdown',e=>{
+  const h=e.target.closest('[data-drag]');if(!h||drag||(e.button&&e.button!==0))return;
+  const item=h.closest('[data-sortitem]');if(!item)return;
+  e.preventDefault();
+  const group=item.dataset.sortitem,box=item.parentElement;
+  const r=item.getBoundingClientRect(),grab=e.clientY-r.top;
+  drag={item,box,group,grab:Math.min(grab,40),y:e.clientY,before:dragKeys(box,group)};
+  if(group==='sec'){const app=document.getElementById('app');app.classList.add('arranging');drag.grab=Math.min(grab,item.offsetHeight/2);
+    const r2=item.getBoundingClientRect();window.scrollBy(0,r2.top-(e.clientY-drag.grab))}
+  document.body.classList.add('is-dragging');item.classList.add('dragging');
+  try{h.setPointerCapture(e.pointerId)}catch(x){}
+  dragPlace();drag.raf=requestAnimationFrame(dragTick);
+});
+document.addEventListener('pointermove',e=>{if(!drag)return;e.preventDefault();drag.y=e.clientY;dragPlace()},{passive:false});
+function dragEnd(){
+  if(!drag)return;const {item,box,group,before,raf}=drag;cancelAnimationFrame(raf);
+  item.style.transform='';item.classList.remove('dragging');document.body.classList.remove('is-dragging');
+  const after=dragKeys(box,group);drag=null;
+  if(group==='sec'){document.getElementById('app').classList.remove('arranging');item.scrollIntoView({block:'start'})}
+  if(after.join()!==before.join()){
+    if(group==='sec'){setLayout(after,true);toast('Home page arranged')}
+    else{const coll=group==='loc'?'locations':'goals';
+      after.forEach((k,i)=>{const x=state[coll].find(y=>y.id===k);if(x&&x.order!==i){const {id,...r}=x;x.order=i;store.put(coll,id,{...r,order:i})}})}
+  }
+  if(renderWaiting||group!=='sec'){renderWaiting=false;render()}
+}
+document.addEventListener('pointerup',dragEnd);
+document.addEventListener('pointercancel',dragEnd);
 
 applyLayout();
 boot();
