@@ -144,6 +144,8 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .spot select{flex:1 1 140px;min-width:0;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:9px 10px}
 .spot .rm{border:0;background:none;color:var(--muted);font-size:13px;padding:4px 6px}
 .ochip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:5px 6px 5px 12px;font-size:14px;font-weight:600}
+.ochip .oname{border:0;background:none;padding:0;font:inherit;font-weight:600;color:inherit;display:inline-flex;align-items:center;gap:4px}
+.ochip .plus{color:var(--rider);font-weight:800}
 .ochip small{font-family:var(--label);color:var(--muted)}
 .ochip button{border:0;background:var(--line);color:var(--ink);width:24px;height:24px;border-radius:50%;padding:0;line-height:1;font-size:15px}
 .trick .tm.needs{color:var(--warn);font-weight:600}
@@ -564,7 +566,9 @@ function mountWhere(box,init,onChange){
   draw();
   return {get:()=>({locId:locName(locId)?locId:'',obstacle})};
 }
-function trickSheet(){
+function trickSheet(preset){
+  preset=preset||{};let rider=preset.rider||ui.rider;
+  if(preset.locId){ui.lastLoc=preset.locId;ui.lastObs=preset.obstacle||''}
   let cat=ui.filter!=='all'?ui.filter:CAT_NAMES[0],stance='Regular',side='Plain';
   const SIDES=['Plain','Frontside','Backside'],SIDE_CATS=['Rails & Ledges'];
   const lf=n=>n.charAt(0).toLowerCase()+n.slice(1);
@@ -574,7 +578,7 @@ function trickSheet(){
   const full=n=>sn(dn(n));
   let where=null;
   const key=(n,c,l,o)=>[n.toLowerCase(),c||'',l||'',(o||'').toLowerCase()].join('|');
-  const have=new Set(state.tricks.filter(t=>t.rider===ui.rider).map(t=>key(fullName(t),t.cat,t.locId,t.obstacle)));
+  let have;const loadHave=()=>{have=new Set(state.tricks.filter(t=>t.rider===rider).map(t=>key(fullName(t),t.cat,t.locId,t.obstacle)))};loadHave();
   const wk=n=>{const w=where?where.get():{};return key(n,cat,w.locId,w.obstacle)};
   const hasStance=n=>STANCES.slice(1).some(st=>n.toLowerCase().startsWith(st.toLowerCase()+' '));
   const hasSide=n=>/^((switch|fakie|nollie) )?(frontside|backside) /i.test(n);
@@ -597,6 +601,7 @@ function trickSheet(){
     s.querySelector('#lib').innerHTML=shownBase.map(n=>btn(n)).join('')+customShown.filter(n=>!shownBase.some(b=>b.toLowerCase()===n.toLowerCase())).map(n=>btn(n,'custom')).join('');
   };
   openSheet(`<h2>Add tricks</h2>
+    <div class="seg" id="arider" role="group" aria-label="Skater">${['a','b'].map(k=>`<button data-k="${k}">${esc(state.riders[k]?.name||'Skater')}</button>`).join('')}</div>
     <p class="note" style="margin:0">Pick where, then tap tricks to add them to the wishlist. Each trick on each obstacle tracks its own progress.</p>
     <div id="where"></div>
     <div class="filters" id="cats"></div>
@@ -607,20 +612,22 @@ function trickSheet(){
       <div class="row"><input id="own" placeholder="e.g. Kickflip to fakie" autocomplete="off" style="flex:1"><button class="btn" id="ownAdd" style="flex:none">Add</button></div></div>
     <button class="btn ghost" id="close">Done</button>`,s=>{
     where=mountWhere(s.querySelector('#where'),{locId:ui.lastLoc,obstacle:ui.lastObs},()=>{if(!where)return;const w=where.get();ui.lastLoc=w.locId;ui.lastObs=w.obstacle;if(s.querySelector('#lib'))draw(s)});
+    const markR=()=>s.querySelectorAll('#arider button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===rider));markR();
+    s.querySelector('#arider').onclick=e=>{const b=e.target.closest('[data-k]');if(b){rider=b.dataset.k;loadHave();markR();draw(s)}};
     draw(s);
     s.querySelector('#cats').onclick=e=>{const b=e.target.closest('[data-c]');if(b){cat=b.dataset.c;draw(s)}};
     s.querySelector('#stc').onclick=e=>{const b=e.target.closest('[data-s]');if(b){stance=b.dataset.s;draw(s)}};
     s.querySelector('#sdc').onclick=e=>{const b=e.target.closest('[data-d]');if(b){side=b.dataset.d;draw(s)}};
-    s.querySelector('#lib').onclick=e=>{const b=e.target.closest('[data-n]');const w=where.get();if(!b||!w.obstacle||have.has(wk(b.dataset.n)))return;addTrick(b.dataset.n,cat,w.locId,w.obstacle);have.add(wk(b.dataset.n));draw(s)};
+    s.querySelector('#lib').onclick=e=>{const b=e.target.closest('[data-n]');const w=where.get();if(!b||!w.obstacle||have.has(wk(b.dataset.n)))return;addTrick(b.dataset.n,cat,w.locId,w.obstacle,rider);have.add(wk(b.dataset.n));draw(s)};
     const own=s.querySelector('#own');
-    const addOwn=()=>{const v=own.value.trim();if(!v)return;const w=where.get();if(!w.locId||!w.obstacle){toast('Pick a location and an obstacle first');return}if(have.has(wk(v))){toast(`${v} is already on the list there`);return}addTrick(v,cat,w.locId,w.obstacle);have.add(wk(v));own.value='';draw(s)};
+    const addOwn=()=>{const v=own.value.trim();if(!v)return;const w=where.get();if(!w.locId||!w.obstacle){toast('Pick a location and an obstacle first');return}if(have.has(wk(v))){toast(`${v} is already on the list there`);return}addTrick(v,cat,w.locId,w.obstacle,rider);have.add(wk(v));own.value='';draw(s)};
     s.querySelector('#ownAdd').onclick=addOwn;own.addEventListener('keydown',e=>{if(e.key==='Enter')addOwn()});
-    s.querySelector('#close').onclick=closeSheet;
+    s.querySelector('#close').onclick=()=>{if(preset.back)preset.back();else closeSheet()};
   });
 }
-function addTrick(name,cat,locId,obstacle){
+function addTrick(name,cat,locId,obstacle,rider){
   const id=uid();
-  store.put('tricks',id,{rider:ui.rider,name,cat,locId,obstacle,status:'wish',notes:'',created:Date.now(),updated:Date.now()});
+  store.put('tricks',id,{rider:rider||ui.rider,name,cat,locId,obstacle,status:'wish',notes:'',created:Date.now(),updated:Date.now()});
   toast(`Added ${name} on ${obstacle}`);
 }
 
@@ -763,7 +770,7 @@ function locSheet(id){
   };
   const body=part('a')+part('b');
   openSheet(`<h2>${esc(l.name)}</h2>
-    <div class="field"><label class="lbl" for="lobsIn">Obstacles here</label><div class="lib" id="lobs"></div>
+    <div class="field"><label class="lbl" for="lobsIn">Obstacles here</label><span class="note" id="lobsHint">Tap an obstacle to add tricks on it.</span><div class="lib" id="lobs"></div>
       <div class="row"><input id="lobsIn" list="obsList" placeholder="e.g. Hubba, flat bar, 5 stair rail" autocomplete="off" style="flex:1"><button class="btn" id="lobsAdd" style="flex:none">Add</button></div>
       <datalist id="obsList">${OBSTACLES.map(o=>`<option value="${esc(o)}"></option>`).join('')}</datalist></div>
     <p class="note" style="margin:0">${tricks.length} trick${tricks.length===1?'':'s'} and ${runs.length} run${runs.length===1?'':'s'} at this spot. Tap one to open it.</p>
@@ -772,12 +779,12 @@ function locSheet(id){
     s.querySelector('#lclose').onclick=closeSheet;
     let obs=[...obstaclesOf(id)];
     const saveObs=()=>{const cur=state.locations.find(x=>x.id===id)||l;const {id:_,...rest}=cur;store.put('locations',id,{...rest,obstacles:obs})};
-    const drawObs=()=>{s.querySelector('#lobs').innerHTML=obs.length?obs.map((o,i)=>{const n=state.tricks.filter(t=>t.locId===id&&t.obstacle===o).length;return `<span class="ochip">${esc(o)}${n?` <small>${n}</small>`:''}<button data-orm="${i}" aria-label="Remove ${esc(o)}">×</button></span>`}).join(''):'<span class="note">No obstacles yet. Add the rails, ledges and ramps at this spot so you can pick them on tricks.</span>'};
+    const drawObs=()=>{s.querySelector('#lobs').innerHTML=obs.length?obs.map((o,i)=>{const n=state.tricks.filter(t=>t.locId===id&&t.obstacle===o).length;return `<span class="ochip"><button class="oname" data-oadd="${i}" aria-label="Add tricks on ${esc(o)}">${esc(o)}${n?` <small>${n}</small>`:''} <span class="plus">+</span></button><button data-orm="${i}" aria-label="Remove ${esc(o)}">×</button></span>`}).join(''):'<span class="note">No obstacles yet. Add the rails, ledges and ramps at this spot so you can pick them on tricks.</span>';const h=s.querySelector('#lobsHint');if(h)h.hidden=!obs.length};
     drawObs();
     const addObs=()=>{const inp=s.querySelector('#lobsIn');const v=inp.value.trim();if(!v)return;if(obs.some(o=>o.toLowerCase()===v.toLowerCase())){toast(`${v} is already here`);return}obs.push(v);inp.value='';drawObs();saveObs()};
     s.querySelector('#lobsAdd').onclick=addObs;
     s.querySelector('#lobsIn').addEventListener('keydown',e=>{if(e.key==='Enter')addObs()});
-    s.querySelector('#lobs').addEventListener('click',e=>{const b=e.target.closest('[data-orm]');if(!b)return;obs.splice(+b.dataset.orm,1);drawObs();saveObs()});
+    s.querySelector('#lobs').addEventListener('click',e=>{const a=e.target.closest('[data-oadd]');if(a){const o=obs[+a.dataset.oadd];if(o)trickSheet({locId:id,obstacle:o,back:()=>locSheet(id)});return}const b=e.target.closest('[data-orm]');if(!b)return;obs.splice(+b.dataset.orm,1);drawObs();saveObs()});
     s.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.edit)editTrick(b.dataset.edit);else if(b.dataset.run)runSheet(b.dataset.run)});
   });
 }
