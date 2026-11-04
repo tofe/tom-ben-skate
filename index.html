@@ -484,12 +484,16 @@ function render(){
     $('#tricks').innerHTML=`<div class="empty">Nothing ${ui.filter!=='all'?'in '+esc(ui.filter)+' ':''}${ui.loc!=='all'?'at '+esc(locName(ui.loc))+' ':''}yet.<br><button class="btn" data-act="add-trick">Add tricks</button></div>`;
   }else{
     const order=['working','landed','locked','wish'];
-    $('#tricks').innerHTML=order.map(k=>{
-      const list=shown.filter(t=>t.status===k).sort((a,b)=>(b.updated||0)-(a.updated||0));
-      if(!list.length)return'';
+    const LIMIT=3;let left=ui.allTricks?Infinity:LIMIT;
+    const html=order.map(k=>{
+      const all=shown.filter(t=>t.status===k).sort((a,b)=>(b.updated||0)-(a.updated||0));
+      if(!all.length||left<=0)return'';
+      const list=all.slice(0,left);left-=list.length;
       const S=STATUSES[SIDX[k]];
-      return `<div class="group"><h3><span class="tag s-${k}">${S.label}</span><span class="lbl">${list.length}</span></h3>${list.map(trickRow).join('')}</div>`
-    }).join('')+`<button class="btn ghost" data-act="add-trick" style="width:100%;margin-top:10px">+ Add more tricks</button>`;
+      return `<div class="group"><h3><span class="tag s-${k}">${S.label}</span><span class="lbl">${all.length}</span></h3>${list.map(trickRow).join('')}</div>`
+    }).join('');
+    const more=shown.length>LIMIT?`<button class="btn ghost" data-act="toggle-tricks" style="width:100%;margin-top:10px">${ui.allTricks?'Show fewer':`Show all ${shown.length} tricks`}</button>`:'';
+    $('#tricks').innerHTML=html+more+`<button class="btn ghost" data-act="add-trick" style="width:100%;margin-top:10px">+ Add more tricks</button>`;
   }
 
   const runs=state.runs.filter(r=>r.rider===R).sort((a,b)=>String(b.at).localeCompare(String(a.at)));
@@ -804,6 +808,7 @@ document.addEventListener('click',e=>{
   if(b.dataset.edit){editTrick(b.dataset.edit);return}
   if(b.dataset.done){toggleGoal(b.dataset.done);return}
   if(b.dataset.gedit){goalSheet(b.dataset.gedit);return}
+  if(b.dataset.act==='toggle-tricks'){ui.allTricks=!ui.allTricks;render();if(!ui.allTricks)document.getElementById('tricks').scrollIntoView({block:'nearest'});return}
   if(b.dataset.act==='add-trick'){trickSheet();return}
   if(b.dataset.act==='add-goal'){goalSheet();return}
   if(b.dataset.act==='new-run'){newRun();return}
