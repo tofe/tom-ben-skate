@@ -446,7 +446,7 @@ function render(){
 
   const locs=sortedLocs();
   $('#locCount').textContent=locs.length?`${locs.length} spot${locs.length===1?'':'s'}`:'';
-  $('#locs').innerHTML=locs.length?locs.map(l=>{const nt=state.tricks.filter(t=>locIdsOf(t).includes(l.id)).length,nr=state.runs.filter(r=>r.locId===l.id).length;const armed=pendingLocDel===l.id;return `<div class="loc"><button class="ln locopen" data-loc="${esc(l.id)}">${esc(l.name)}<span class="lc">${nt} trick${nt===1?'':'s'} · ${nr} run${nr===1?'':'s'} ›</span></button><button class="x ${armed?'armed':''}" data-ldel="${esc(l.id)}">${armed?'Tap to delete':'Delete'}</button></div>`}).join(''):`<div class="empty">No locations yet. Add a park or spot above, then pick it on any trick or run.</div>`;
+  $('#locs').innerHTML=locs.length?locs.map(l=>{const nt=state.tricks.filter(t=>locIdsOf(t).includes(l.id)).length,nr=state.runs.filter(r=>r.locId===l.id).length;const no=obstaclesOf(l.id).length;const armed=pendingLocDel===l.id;return `<div class="loc"><button class="ln locopen" data-loc="${esc(l.id)}">${esc(l.name)}<span class="lc">${no} obstacle${no===1?'':'s'} · ${nt} trick${nt===1?'':'s'} · ${nr} run${nr===1?'':'s'} ›</span></button><button class="x ${armed?'armed':''}" data-ldel="${esc(l.id)}">${armed?'Tap to delete':'Delete'}</button></div>`}).join(''):`<div class="empty">No locations yet. Add a park or spot above, then pick it on any trick or run.</div>`;
 
   $('#footnote').textContent=store.mode==='db'?'Synced through your family login, so it matches on every phone and laptop. Tap the selected skater for names, photos, backups and sign out.':'';
 }
