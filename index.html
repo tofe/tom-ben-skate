@@ -175,6 +175,7 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .sheet h2{font-size:22px}
 .seg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .seg4{grid-template-columns:repeat(4,1fr)}
+.seg3{grid-template-columns:repeat(3,1fr)}
 .seg button{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px 4px;font-family:var(--label);font-weight:700;font-size:14px}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .field{display:flex;flex-direction:column;gap:6px}
@@ -479,26 +480,38 @@ function addMenu(){
 }
 
 function trickSheet(){
-  let cat=ui.filter!=='all'?ui.filter:CAT_NAMES[0],stance='Regular';
-  const sn=n=>stance==='Regular'?n:stance+' '+n.charAt(0).toLowerCase()+n.slice(1);
+  let cat=ui.filter!=='all'?ui.filter:CAT_NAMES[0],stance='Regular',side='Plain';
+  const SIDES=['Plain','Frontside','Backside'],SIDE_CATS=['Rails & Ledges'];
+  const lf=n=>n.charAt(0).toLowerCase()+n.slice(1);
+  const sidesOn=()=>SIDE_CATS.includes(cat);
+  const sn=n=>stance==='Regular'?n:stance+' '+lf(n);
+  const dn=n=>(!sidesOn()||side==='Plain')?n:side+' '+lf(n);
+  const full=n=>sn(dn(n));
   const key=(n,c)=>n.toLowerCase()+'|'+(c||'');
   const have=new Set(state.tricks.filter(t=>t.rider===ui.rider).map(t=>key(fullName(t),t.cat)));
+  const hasStance=n=>STANCES.slice(1).some(st=>n.toLowerCase().startsWith(st.toLowerCase()+' '));
+  const hasSide=n=>/^((switch|fakie|nollie) )?(frontside|backside) /i.test(n);
   const draw=s=>{
     s.querySelector('#cats').innerHTML=CAT_NAMES.map(c=>`<button class="chip" data-c="${esc(c)}" aria-pressed="${c===cat}">${esc(c)}</button>`).join('');
     s.querySelectorAll('#stc button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.s===stance));
+    s.querySelector('#sdc').hidden=!sidesOn();
+    s.querySelectorAll('#sdc button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.d===side));
     // built-in tricks for this section, plus any trick name either skater has typed in for it
     const base=CATS[cat]||[];
-    const baseSet=new Set(base.flatMap(n=>STANCES.map(st=>(st==='Regular'?n:st+' '+n.charAt(0).toLowerCase()+n.slice(1)).toLowerCase())));
-    const hasStance=n=>STANCES.slice(1).some(st=>n.toLowerCase().startsWith(st.toLowerCase()+' '));
+    const variants=n=>(sidesOn()?SIDES:['Plain']).flatMap(sd=>{const d=sd==='Plain'?n:sd+' '+lf(n);return STANCES.map(st=>(st==='Regular'?d:st+' '+lf(d)).toLowerCase())});
+    const baseSet=new Set(base.flatMap(variants));
     const customs=[...new Map(state.tricks.filter(t=>t.cat===cat&&!baseSet.has(fullName(t).toLowerCase())).map(t=>[fullName(t).toLowerCase(),fullName(t)])).values()].sort((a,b)=>a.localeCompare(b));
-    const customShown=customs.filter(n=>stance==='Regular'||!hasStance(n)).map(n=>stance==='Regular'?n:sn(n));
+    const plain=stance==='Regular'&&(side==='Plain'||!sidesOn());
+    const customShown=customs.filter(n=>plain||(!hasStance(n)&&!hasSide(n))).map(n=>plain?n:full(n));
+    const shownBase=base.map(full);
     const btn=(n,extra)=>`<button data-n="${esc(n)}" class="${have.has(key(n,cat))?'have':''} ${extra||''}">${esc(n)}</button>`;
-    s.querySelector('#lib').innerHTML=base.map(sn).map(n=>btn(n)).join('')+customShown.filter(n=>!base.map(sn).some(b=>b.toLowerCase()===n.toLowerCase())).map(n=>btn(n,'custom')).join('');
+    s.querySelector('#lib').innerHTML=shownBase.map(n=>btn(n)).join('')+customShown.filter(n=>!shownBase.some(b=>b.toLowerCase()===n.toLowerCase())).map(n=>btn(n,'custom')).join('');
   };
   openSheet(`<h2>Add tricks</h2>
     <p class="note" style="margin:0">Tap to add to the wishlist. You can move them along as they progress.</p>
     <div class="filters" id="cats"></div>
     <div class="seg seg4" id="stc" role="group" aria-label="Stance">${STANCES.map(s=>`<button data-s="${s}">${s}</button>`).join('')}</div>
+    <div class="seg seg3" id="sdc" role="group" aria-label="Frontside or backside" hidden>${['Plain','Frontside','Backside'].map(d=>`<button data-d="${d}">${d==='Plain'?'No side':d}</button>`).join('')}</div>
     <div class="lib" id="lib"></div>
     <div class="field"><label class="lbl" for="own">Or type your own</label>
       <div class="row"><input id="own" placeholder="e.g. Kickflip to fakie" autocomplete="off" style="flex:1"><button class="btn" id="ownAdd" style="flex:none">Add</button></div></div>
@@ -506,6 +519,7 @@ function trickSheet(){
     draw(s);
     s.querySelector('#cats').onclick=e=>{const b=e.target.closest('[data-c]');if(b){cat=b.dataset.c;draw(s)}};
     s.querySelector('#stc').onclick=e=>{const b=e.target.closest('[data-s]');if(b){stance=b.dataset.s;draw(s)}};
+    s.querySelector('#sdc').onclick=e=>{const b=e.target.closest('[data-d]');if(b){side=b.dataset.d;draw(s)}};
     s.querySelector('#lib').onclick=e=>{const b=e.target.closest('[data-n]');if(!b||have.has(key(b.dataset.n,cat)))return;addTrick(b.dataset.n,cat);have.add(key(b.dataset.n,cat));draw(s)};
     const own=s.querySelector('#own');
     const addOwn=()=>{const v=own.value.trim();if(!v)return;addTrick(v,cat);have.add(key(v,cat));own.value='';draw(s)};
