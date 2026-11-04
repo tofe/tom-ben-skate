@@ -165,6 +165,14 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .linkbtn{border:0;background:none;color:var(--rider);font-weight:700;font-size:15px;padding:2px 4px}
 .confirmbox{display:flex;flex-direction:column;gap:10px;border:1px solid var(--miss);background:var(--surface);border-radius:12px;padding:12px}
 .trick .tm.needs{color:var(--warn);font-weight:600}
+.round{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:14px;padding:12px;background:var(--bg)}
+.round.final{border-color:var(--locked)}
+.round .rhead{display:flex;align-items:center;gap:8px}
+.round .rname{flex:1;min-width:0;font:inherit;font-family:var(--display);font-size:18px;border:0;border-bottom:1px dashed var(--line);background:transparent;color:var(--ink);padding:2px 0;border-radius:0}
+.round .rmround{align-self:flex-start;font-size:13px;color:var(--muted)}
+.av.mini{width:28px;height:28px;font-size:13px;flex:none}
+.cscore{flex:none;font-family:var(--display);font-size:20px}
+.compnote{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--bg);border:1px solid var(--line);border-left:5px solid var(--locked);border-radius:12px;padding:10px 12px}
 .gear{display:flex;align-items:baseline;gap:4px 10px;flex-wrap:wrap;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .gear.cur{border-left:5px solid var(--rider)}
 .gear .gt2{font-weight:700;font-size:16px;overflow-wrap:anywhere}
@@ -315,6 +323,11 @@ body.is-dragging .handle{cursor:grabbing}
     <div id="runs" class="group"></div>
   </section>
 
+  <section class="hsec" data-sec="comps" data-sortitem="sec" data-key="comps">
+    <div class="sh"><h2>Competitions</h2><span class="lbl" id="compCount"></span><button class="handle" data-drag aria-label="Drag to move Competitions"><svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><g fill="currentColor"><circle cx="2" cy="2" r="1.6"/><circle cx="8" cy="2" r="1.6"/><circle cx="2" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="2" cy="14" r="1.6"/><circle cx="8" cy="14" r="1.6"/></g></svg></button></div>
+    <div id="comps" class="group"></div>
+  </section>
+
 
   <section class="hsec" data-sec="decks" data-sortitem="sec" data-key="decks">
     <div class="sh"><h2>Decks</h2><span class="lbl" id="boardCount"></span><button class="handle" data-drag aria-label="Drag to move Decks"><svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><g fill="currentColor"><circle cx="2" cy="2" r="1.6"/><circle cx="8" cy="2" r="1.6"/><circle cx="2" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="2" cy="14" r="1.6"/><circle cx="8" cy="14" r="1.6"/></g></svg></button></div>
@@ -365,12 +378,12 @@ const locName=id=>state.locations.find(l=>l.id===id)?.name||'';
 const obstaclesOf=id=>{const l=state.locations.find(x=>x.id===id);return Array.isArray(l?.obstacles)?l.obstacles:[]};
 const fullName=t=>t.stance&&t.stance!=='Regular'&&!t.name.toLowerCase().startsWith(t.stance.toLowerCase())?t.stance+' '+t.name.charAt(0).toLowerCase()+t.name.slice(1):t.name;
 
-let state={riders:{a:{name:'Skater 1'},b:{name:'Skater 2'}},tricks:[],goals:[],locations:[],runs:[],boards:[],shoes:[],runDefs:[]};
+let state={riders:{a:{name:'Skater 1'},b:{name:'Skater 2'}},tricks:[],goals:[],locations:[],runs:[],boards:[],shoes:[],runDefs:[],comps:[]};
 let sheetOnClose=null;
 const GRIP='<svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><g fill="currentColor"><circle cx="2" cy="2" r="1.6"/><circle cx="8" cy="2" r="1.6"/><circle cx="2" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="2" cy="14" r="1.6"/><circle cx="8" cy="14" r="1.6"/></g></svg>';
-const SECTIONS=[['goals','Goals'],['locations','Locations'],['tricks','Tricks'],['runs','Runs'],['decks','Decks'],['shoes','Shoes']];
+const SECTIONS=[['goals','Goals'],['locations','Locations'],['tricks','Tricks'],['runs','Runs'],['comps','Competitions'],['decks','Decks'],['shoes','Shoes']];
 let layout=null;try{const l=JSON.parse(localStorage.getItem('skate-layout')||'null');if(Array.isArray(l))layout=l}catch(e){}
-function sectionOrder(){const known=SECTIONS.map(x=>x[0]);const o=(layout||[]).filter(k=>known.includes(k));known.forEach(k=>{if(!o.includes(k))o.push(k)});return o}
+function sectionOrder(){const known=SECTIONS.map(x=>x[0]);const o=(layout||[]).filter(k=>known.includes(k));known.forEach((k,i)=>{if(o.includes(k))return;const prev=known.slice(0,i).reverse().find(p=>o.includes(p));o.splice(prev?o.indexOf(prev)+1:0,0,k)});return o}
 function applyLayout(){const app=document.getElementById('app'),anchor=app.querySelector('[data-act="arrange"]');sectionOrder().forEach(k=>{const el=app.querySelector(`section[data-sec="${k}"]`);if(el)app.insertBefore(el,anchor)})}
 function setLayout(o,save){layout=o;try{localStorage.setItem('skate-layout',JSON.stringify(o))}catch(e){}applyLayout();if(save&&store.db)store.db.doc('app/layout').set({order:o}).catch(saveErr)}
 function arrangeSheet(){
@@ -423,7 +436,7 @@ function showApp(on){$('#app').hidden=!on;$('#login').hidden=on}
 
 function boot(){
   render();
-  if(window.PREVIEW_DATA){const d=window.PREVIEW_DATA;state.riders=d.riders||state.riders;['tricks','goals','locations','runs','boards','shoes','runDefs'].forEach(k=>state[k]=d[k]||[]);state.bg=d.background||'';applyBg();showApp(true);$('#sync').textContent='Preview · not saved';render();return}
+  if(window.PREVIEW_DATA){const d=window.PREVIEW_DATA;state.riders=d.riders||state.riders;['tricks','goals','locations','runs','boards','shoes','runDefs','comps'].forEach(k=>state[k]=d[k]||[]);state.bg=d.background||'';applyBg();showApp(true);$('#sync').textContent='Preview · not saved';render();return}
   if(!window.firebase||String(firebaseConfig.apiKey).startsWith('PASTE')){
     showApp(false);
     $('#loginNote').textContent='Almost there. Paste your Firebase settings into index.html, as described in README.md.';
@@ -457,7 +470,7 @@ function convertSpots(){
     sp.slice(1).forEach((x,i)=>store.put('tricks',id+'-'+(i+1),{...rest,locId:x.locId,obstacle:x.obstacle||'',created:Date.now(),updated:Date.now()}));
   });
 }
-function stopSync(){subs.forEach(f=>f());subs=[];state.tricks=[];state.goals=[];state.locations=[];state.runs=[];state.boards=[];state.shoes=[];state.runDefs=[];state.bg='';applyBg();render()}
+function stopSync(){subs.forEach(f=>f());subs=[];state.tricks=[];state.goals=[];state.locations=[];state.runs=[];state.boards=[];state.shoes=[];state.runDefs=[];state.comps=[];state.bg='';applyBg();render()}
 function applyBg(){const el=$('#bgimg');el.style.backgroundImage=state.bg?`url("${state.bg}")`:'';el.hidden=!state.bg;document.body.classList.toggle('hasbg',!!state.bg)}
 function shrinkBg(file){
   return new Promise((res,rej)=>{
@@ -482,6 +495,7 @@ function startSync(){
   subs.push(db.doc('app/background').onSnapshot(s=>{state.bg=s.exists?(s.data().photo||''):'';applyBg()},fail));
   subs.push(db.collection('locations').onSnapshot(s=>{state.locations=rows(s);render()},fail));
   subs.push(db.collection('runs').onSnapshot(M,s=>{state.runs=rows(s);if(!s.metadata.fromCache){runsReady=true;migrateRuns()}render()},fail));
+  subs.push(db.collection('comps').onSnapshot(s=>{state.comps=rows(s);render()},fail));
   subs.push(db.collection('runDefs').onSnapshot(M,s=>{state.runDefs=rows(s);if(!s.metadata.fromCache){defsReady=true;migrateRuns()}render()},fail));
   subs.push(db.doc('app/layout').onSnapshot(s=>{if(s.exists&&Array.isArray(s.data().order))setLayout(s.data().order,false)},()=>{}));
   subs.push(db.collection('boards').onSnapshot(s=>{state.boards=rows(s);render()},fail));
@@ -491,7 +505,7 @@ function startSync(){
 async function exportData(){
   let trickPhotos=[];
   if(store.db){toast('Preparing backup…');try{const snap=await store.db.collection('trickPhotos').get();trickPhotos=snap.docs.map(d=>({...d.data(),id:d.id}))}catch(e){toast('Trick photos couldn’t be included. Check your connection.')}}
-  const out={trickPhotos,app:'skate-log',version:1,exported:new Date().toISOString(),riders:state.riders,background:state.bg||'',tricks:state.tricks,goals:state.goals,locations:state.locations,runs:state.runs,boards:state.boards,shoes:state.shoes,runDefs:state.runDefs};
+  const out={trickPhotos,app:'skate-log',version:1,exported:new Date().toISOString(),riders:state.riders,background:state.bg||'',tricks:state.tricks,goals:state.goals,locations:state.locations,runs:state.runs,boards:state.boards,shoes:state.shoes,runDefs:state.runDefs,comps:state.comps};
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,1)],{type:'application/json'}));
   a.download=`skate-log-backup-${today()}.json`;document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
@@ -502,7 +516,7 @@ async function importData(file){
   const ops=[];
   if(d.riders)ops.push(['app','riders',d.riders]);
   if(d.background)ops.push(['app','background',{photo:d.background}]);
-  ['tricks','goals','locations','runs','boards','shoes','runDefs'].forEach(c=>(d[c]||[]).forEach(({id,...rest})=>{if(id)ops.push([c,id,rest])}));
+  ['tricks','goals','locations','runs','boards','shoes','runDefs','comps'].forEach(c=>(d[c]||[]).forEach(({id,...rest})=>{if(id)ops.push([c,id,rest])}));
   toast(`Importing ${ops.length} items…`);
   try{
     for(let i=0;i<ops.length;i+=400){const b=store.db.batch();ops.slice(i,i+400).forEach(([c,id,data])=>b.set(store.db.doc(c+'/'+id),data));await b.commit()}
@@ -569,6 +583,11 @@ function render(){
   const groups=runGroups(R);
   $('#runCount').textContent=groups.length?`${groups.length} run${groups.length===1?'':'s'} · ${runs.length} tr${runs.length===1?'y':'ies'}`:'';
   $('#runs').innerHTML=runs.length?groups.map(runGroupRow).join('')+`<button class="btn ghost" data-act="new-run" style="width:100%">+ New run</button>`:`<div class="empty">No runs yet for ${name}.<br>Build a run from their tricks, then tick each one landed or missed.<br><button class="btn" data-act="new-run">Start a run</button></div>`;
+
+  const comps=state.comps.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  $('#compCount').textContent=comps.length?`${comps.length} comp${comps.length===1?'':'s'}`:'';
+  $('#comps').innerHTML=comps.length?comps.map(compRow).join('')+`<button class="btn ghost" data-act="add-comp" style="width:100%">+ Add a competition</button>`
+    :`<div class="gearempty"><span>No competitions yet.</span><button class="btn ghost sm" data-act="add-comp">+ Add</button></div>`;
 
   $('#goalCount').textContent=goals.length?`${gDone} of ${goals.length} done`:'';
   const ord=x=>typeof x.order==='number'?x.order:1e9;
@@ -894,6 +913,8 @@ document.addEventListener('click',e=>{
   if(b.dataset.act==='new-run'){newRun();return}
   if(b.dataset.run){runSheet(b.dataset.run);return}
   if(b.dataset.rg){runGroupSheet(b.dataset.rg);return}
+  if(b.dataset.act==='add-comp'){newComp();return}
+  if(b.dataset.comp){compSheet(b.dataset.comp);return}
   if(b.dataset.act==='add-board'){boardSheet();return}
   if(b.dataset.act==='past-decks'){ui.pastDecks=!ui.pastDecks;render();return}
   if(b.dataset.act==='past-shoes'){ui.pastShoes=!ui.pastShoes;render();return}
@@ -1140,7 +1161,7 @@ function runGroupSheet(id){
     <div class="rgwrap"><table class="rgt"><thead><tr><th scope="col">Trick</th>${chron.map((t,j)=>`<th scope="col" title="${esc(fmtDT(t.at))}">${j+1}<small>${esc(dShort(t.at))}</small></th>`).join('')}<th scope="col">Landed</th></tr></thead>
       <tbody>${stats.map(({it,res,land,tried})=>`<tr class="${it.gone?'gone':''}"><th scope="row">${esc(it.name)}${it.obstacle||it.gone?`<small>${[it.obstacle,it.gone?'no longer in run':''].filter(Boolean).map(esc).join(' · ')}</small>`:''}</th>${res.map(x=>`<td><span class="cell ${x}" aria-label="${x==='land'?'Landed':x==='miss'?'Missed':x==='none'?'Not in run then':'Not tried'}">${x==='land'?'✓':x==='miss'?'✕':x==='none'?'–':'·'}</span></td>`).join('')}<td class="pct">${land}/${tried||0}</td></tr>`).join('')}</tbody></table></div>
     <span class="lbl">Tries</span>
-    <div class="group">${tries.map((t,j)=>{const sc=runScore(t);return `<button class="ltr" data-try="${esc(t.id)}"><span class="n">Try ${tries.length-j}<span class="m">${esc(fmtDT(t.at))}</span><span class="marks" aria-hidden="true">${(t.items||[]).map(i=>`<i class="${esc(i.res||'')}"></i>`).join('')}</span></span><span class="lbl" style="color:var(--ink)">${sc.land}/${sc.total}</span></button>`}).join('')}</div>
+    <div class="group">${tries.map((t,j)=>{const sc=runScore(t);return `<button class="ltr" data-try="${esc(t.id)}"><span class="n">Try ${tries.length-j}<span class="m">${esc([fmtDT(t.at),compLabel(t)].filter(Boolean).join(' · '))}</span><span class="marks" aria-hidden="true">${(t.items||[]).map(i=>`<i class="${esc(i.res||'')}"></i>`).join('')}</span></span><span class="lbl" style="color:var(--ink)">${sc.land}/${sc.total}</span></button>`}).join('')}</div>
     <div class="row"><button class="btn" id="gnew">Start a new try</button><button class="btn ghost" id="gedit">Edit tricks</button></div>
     <button class="btn ghost" id="gclose">Close</button>`,s=>{
     s.querySelector('#gclose').onclick=closeSheet;
@@ -1188,9 +1209,93 @@ function defSheet(latest,back){
     };
   });
 }
+/* ---------- competitions ---------- */
+function compLabel(r){if(!r.compId)return'';const c=state.comps.find(x=>x.id===r.compId);if(!c)return'';const rd=(c.rounds||[]).find(x=>x.id===r.roundId);return c.name+(rd?' '+rd.name:'')}
+function compRow(c){
+  const runs=state.runs.filter(r=>r.compId===c.id);const R=ui.rider;const place=(c.places||{})[R];
+  const meta=[c.date?fmtDate(c.date)+' '+new Date(c.date+'T12:00:00').getFullYear():'',locName(c.locId),`${(c.rounds||[]).length} round${(c.rounds||[]).length===1?'':'s'}`,`${runs.length} run${runs.length===1?'':'s'}`].filter(Boolean).join(' · ');
+  return `<button class="runrow" data-comp="${esc(c.id)}"><span class="t"><span class="tn">${esc(c.name||'Competition')}</span><span class="tm">${esc(meta)}</span></span>${place?`<span class="score"><b>${esc(place)}</b><small class="best">${esc(state.riders[R]?.name||'')}</small></span>`:''}</button>`;
+}
+function newComp(){
+  const id=uid();
+  const data={name:'Competition',date:today(),locId:ui.loc!=='all'?ui.loc:'',rounds:[{id:uid(),name:'Heat 1',kind:'heat'}],places:{a:'',b:''},created:Date.now(),updated:Date.now()};
+  store.put('comps',id,data);
+  let n=0;const open=()=>{if(state.comps.some(c=>c.id===id))compSheet(id,true);else if(++n<40)setTimeout(open,50)};open();
+}
+function compSheet(id,isNew){
+  const c=state.comps.find(x=>x.id===id);if(!c)return;
+  const d={name:c.name||'',date:c.date||'',locId:c.locId||'',rounds:JSON.parse(JSON.stringify(c.rounds||[])),places:{a:'',b:'',...(c.places||{})}};
+  let timer=null,confirmDel=false,armed=null;
+  const flush=()=>{clearTimeout(timer);timer=null;const cur=state.comps.find(x=>x.id===id)||c;const {id:_,...r}=cur;store.put('comps',id,{...r,...JSON.parse(JSON.stringify(d)),updated:Date.now()})};
+  const save=()=>{clearTimeout(timer);timer=setTimeout(flush,400)};
+  const back=()=>compSheet(id);
+  const rname=k=>state.riders[k]?.name||'Skater';
+  openSheet(`<h2>${isNew?'New competition':'Competition'}</h2>
+    <div class="field"><label class="lbl" for="cname">Name</label><input id="cname" value="${esc(d.name)}" placeholder="e.g. Westside Jam 2026" autocomplete="off"></div>
+    <div class="row"><div class="field" style="flex:1;min-width:140px"><label class="lbl" for="cdate">Date</label><input id="cdate" type="date" value="${esc(d.date)}"></div>
+      <div class="field" style="flex:1;min-width:140px"><label class="lbl" for="cloc">Location</label><select id="cloc"><option value="">No location</option>${sortedLocs().map(l=>`<option value="${esc(l.id)}" ${l.id===d.locId?'selected':''}>${esc(l.name)}</option>`).join('')}</select></div></div>
+    <div class="row">${['a','b'].map(k=>`<div class="field" style="flex:1;min-width:120px"><label class="lbl" for="cp${k}">${esc(rname(k))}'s result</label><input id="cp${k}" value="${esc(d.places[k]||'')}" placeholder="e.g. 3rd" autocomplete="off"></div>`).join('')}</div>
+    <div id="crounds" class="group"></div>
+    <div class="row"><button class="btn ghost" id="caddheat">+ Add a heat</button><button class="btn ghost" id="caddfinal">+ Add a final</button></div>
+    <button class="btn" id="cdone">Done</button>
+    <button class="btn danger" id="cdel">Delete competition</button>`,s=>{
+    const draw=()=>{
+      s.querySelector('#crounds').innerHTML=d.rounds.length?d.rounds.map((rd,i)=>{
+        const tries=state.runs.filter(r=>r.compId===id&&r.roundId===rd.id).sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+        return `<div class="round ${rd.kind==='final'?'final':''}">
+          <div class="rhead"><input class="rname" data-ri="${i}" value="${esc(rd.name)}" aria-label="Round name"><span class="tag ${rd.kind==='final'?'s-locked':'s-wish'}">${rd.kind==='final'?'Final':'Heat'}</span></div>
+          ${tries.length?tries.map(t=>{const sc=runScore(t);const rr=state.riders[t.rider]||{};return `<button class="ltr" data-ctry="${esc(t.id)}"><span class="av av-${esc(t.rider)} mini">${rr.photo?`<img src="${esc(rr.photo)}" alt="">`:esc(((rr.name||'?').trim()[0]||'?').toUpperCase())}</span><span class="n">${esc(rr.name||'')} · ${esc(t.name||'Run')}<span class="m">${esc(fmtDT(t.at))}${sc.total?` · ${sc.land}/${sc.total} landed`:''}</span></span>${t.compScore?`<span class="cscore">${esc(t.compScore)}</span>`:''}</button>`}).join(''):'<span class="note">No runs in this round yet.</span>'}
+          <div class="row">${['a','b'].map(k=>`<button class="btn ghost sm" data-addrun="${esc(rd.id)}" data-k="${k}">+ Run for ${esc(rname(k))}</button>`).join('')}</div>
+          <button class="linkbtn rmround" data-rmr="${i}">${armed===i?(tries.length?`Tap again: remove round and unlink ${tries.length} run${tries.length===1?'':'s'}`:'Tap again to remove'):'Remove round'}</button>
+        </div>`}).join(''):'<span class="note">Add a heat or a final to start logging runs.</span>';
+    };
+    draw();
+    s.querySelector('#cname').addEventListener('input',e=>{d.name=e.target.value;save()});
+    s.querySelector('#cdate').addEventListener('change',e=>{d.date=e.target.value;save()});
+    s.querySelector('#cloc').addEventListener('change',e=>{d.locId=e.target.value;save()});
+    ['a','b'].forEach(k=>s.querySelector('#cp'+k).addEventListener('input',e=>{d.places[k]=e.target.value.trim();save()}));
+    s.querySelector('#crounds').addEventListener('input',e=>{const el=e.target.closest('.rname');if(!el)return;d.rounds[+el.dataset.ri].name=el.value;save()});
+    const addRound=kind=>{const n=d.rounds.filter(r=>r.kind===kind).length+1;d.rounds.push({id:uid(),kind,name:kind==='final'?(n===1?'Final':'Final '+n):'Heat '+n});armed=null;draw();save()};
+    s.querySelector('#caddheat').onclick=()=>addRound('heat');
+    s.querySelector('#caddfinal').onclick=()=>addRound('final');
+    s.querySelector('#crounds').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+      if(b.dataset.ctry){if(timer)flush();runSheet(b.dataset.ctry,null,back);return}
+      if(b.dataset.addrun){if(timer)flush();compRunPicker(id,b.dataset.addrun,b.dataset.k,d.locId);return}
+      if(b.dataset.rmr!==undefined){const i=+b.dataset.rmr;if(armed!==i){armed=i;draw();return}
+        const rd=d.rounds[i];state.runs.filter(r=>r.compId===id&&r.roundId===rd.id).forEach(r=>{const {id:rid,...rest}=r;store.put('runs',rid,{...rest,compId:'',roundId:''})});
+        d.rounds.splice(i,1);armed=null;draw();save();toast('Round removed')}});
+    s.querySelector('#cdone').onclick=()=>{if(timer)flush();closeSheet()};
+    s.querySelector('#cdel').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete. Runs stay in Runs.';return}
+      clearTimeout(timer);timer=null;sheetOnClose=null;
+      state.runs.filter(r=>r.compId===id).forEach(r=>{const {id:rid,...rest}=r;store.put('runs',rid,{...rest,compId:'',roundId:''})});
+      store.del('comps',id);closeSheet();toast('Competition deleted')};
+  });
+  sheetOnClose=()=>{if(timer)flush()};
+}
+function compRunPicker(compId,roundId,rider,locId){
+  const c=state.comps.find(x=>x.id===compId);const rd=c&&(c.rounds||[]).find(x=>x.id===roundId);
+  const groups=runGroups(rider);const who=esc(state.riders[rider]?.name||'Skater');
+  const back=()=>compSheet(compId);
+  openSheet(`<h2>Add a run for ${who}</h2>
+    <p class="note" style="margin:0">${esc(c?.name||'')}${rd?' · '+esc(rd.name):''}. Pick one of ${who}'s runs to start a new try, or build a new one. It also shows in Runs.</p>
+    <div class="group">${groups.length?groups.map(g=>{const r=g[0],def=defOf(r);const items=(def?def.items:r.items)||[];return `<button class="ltr" data-pick="${esc(r.id)}"><span class="n">${esc(def?.name||r.name||'Run')}<span class="m">${esc([`${items.length} trick${items.length===1?'':'s'}`,locName(def?def.locId:r.locId),`${g.length} tr${g.length===1?'y':'ies'}`].filter(Boolean).join(' · '))}</span></span><span class="lbl">Use ›</span></button>`}).join(''):`<span class="note">${who} has no runs yet.</span>`}</div>
+    <button class="btn" id="pnew">Build a new run</button>
+    <button class="btn ghost" id="pback">Back</button>`,s=>{
+    s.querySelector('#pback').onclick=back;
+    s.addEventListener('click',e=>{const b=e.target.closest('[data-pick]');if(!b)return;
+      const r=state.runs.find(x=>x.id===b.dataset.pick);if(!r)return;const def=defOf(r)||r;
+      const nid=uid();const nd={rider,defId:r.defId||'',name:def.name||r.name,locId:locId||def.locId||'',at:nowLocal(),compId,roundId,compScore:'',items:(def.items||[]).map(i=>({tid:i.tid,name:i.name,res:'',obstacle:i.obstacle||''})),created:Date.now(),updated:Date.now()};
+      store.put('runs',nid,nd);runSheet(nid,nd,back);toast('Run added to '+(rd?rd.name:'competition'))});
+    s.querySelector('#pnew').onclick=()=>{
+      const id=uid(),defId='def-'+id,name=(c?.name||'Comp')+' run',loc=locId||'';
+      store.put('runDefs',defId,{rider,name,locId:loc,items:[],created:Date.now(),updated:Date.now()});
+      const nd={rider,defId,name,locId:loc,at:nowLocal(),compId,roundId,compScore:'',items:[],created:Date.now(),updated:Date.now()};
+      store.put('runs',id,nd);runSheet(id,nd,back)};
+  });
+}
 function runRow(r){
   const sc=runScore(r);const loc=r.locId&&state.locations.find(l=>l.id===r.locId);
-  const meta=[fmtDT(r.at),loc?loc.name:''].filter(Boolean).join(' · ');
+  const meta=[fmtDT(r.at),loc?loc.name:'',compLabel(r)].filter(Boolean).join(' · ');
   return `<button class="runrow" data-run="${esc(r.id)}"><span class="t"><span class="tn">${esc(r.name||'Run')}</span>${meta?`<span class="tm">${esc(meta)}</span>`:''}${sc.total?`<span class="marks" aria-hidden="true">${(r.items||[]).map(i=>`<i class="${esc(i.res||'')}"></i>`).join('')}</span>`:''}</span><span class="score" aria-label="${sc.land} of ${sc.total} landed"><b>${sc.land}</b>/${sc.total}</span></button>`;
 }
 function newRun(){
@@ -1213,7 +1318,9 @@ function runSheet(id,initial,back){
   const saveS=()=>{structChanged=true;save()};
   const myTricks=()=>state.tricks.filter(t=>t.rider===d.rider).sort((a,b)=>((b.locId===d.locId)-(a.locId===d.locId))||fullName(a).localeCompare(fullName(b))||String(a.obstacle||'').localeCompare(String(b.obstacle||'')));
   const who=esc(state.riders[d.rider]?.name||'they');
+  const comp=d.compId&&state.comps.find(c=>c.id===d.compId);const round=comp&&(comp.rounds||[]).find(r=>r.id===d.roundId);
   openSheet(`<h2>Run</h2>
+    ${comp?`<div class="compnote"><span><b>${esc(comp.name)}</b>${round?' · '+esc(round.name):''}</span><div class="field" style="flex:none;width:130px"><label class="lbl" for="rcs">Judges' score</label><input id="rcs" inputmode="decimal" value="${esc(d.compScore||'')}" placeholder="e.g. 72.5" autocomplete="off"></div></div>`:''}
     <div class="field"><label class="lbl" for="rname">Name</label><input id="rname" value="${esc(d.name)}"></div>
     <div class="row"><div class="field" style="flex:1;min-width:150px"><label class="lbl" for="rat">Date & time</label><input id="rat" type="datetime-local" value="${esc(d.at)}"></div>
       <div class="field" style="flex:1;min-width:150px"><label class="lbl" for="rloc">Location</label><select id="rloc"><option value="">No location</option>${sortedLocs().map(l=>`<option value="${esc(l.id)}" ${l.id===d.locId?'selected':''}>${esc(l.name)}</option>`).join('')}</select></div></div>
@@ -1245,6 +1352,7 @@ function runSheet(id,initial,back){
       d.items.push({tid:t.id,name:fullName(t),res:'',obstacle:t.locId===d.locId&&t.obstacle?t.obstacle:''});draw();saveS()};
     s.querySelector('#ritems').addEventListener('change',e=>{const el=e.target.closest('select.robs');if(!el)return;const it=d.items[+el.dataset.oi];if(it){it.obstacle=el.value;saveS()}});
     s.querySelector('#rname').addEventListener('input',e=>{d.name=e.target.value;saveS()});
+    const rcs=s.querySelector('#rcs');if(rcs)rcs.addEventListener('input',e=>{d.compScore=e.target.value.trim();save()});
     s.querySelector('#rat').addEventListener('change',e=>{d.at=e.target.value;save()});
     s.querySelector('#rloc').addEventListener('change',e=>{d.locId=e.target.value;const ok=obstaclesOf(d.locId);d.items.forEach(it=>{if(it.obstacle&&!ok.includes(it.obstacle))it.obstacle=''});draw();saveS()});
     s.querySelector('#rdone').onclick=()=>{closeSheet();if(back)back()};
