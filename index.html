@@ -289,8 +289,6 @@ body.is-dragging .handle{cursor:grabbing}
 
   <section class="hsec" data-sec="locations" data-sortitem="sec" data-key="locations">
     <div class="sh"><h2>Locations</h2><span class="lbl" id="locCount"></span><button class="handle" data-drag aria-label="Drag to move Locations"><svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><g fill="currentColor"><circle cx="2" cy="2" r="1.6"/><circle cx="8" cy="2" r="1.6"/><circle cx="2" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="2" cy="14" r="1.6"/><circle cx="8" cy="14" r="1.6"/></g></svg></button></div>
-    <div class="field"><label class="lbl" for="newLoc">Add a skatepark or spot</label>
-      <div class="row"><input id="newLoc" placeholder="e.g. Local skatepark, school stairs" autocomplete="off" style="flex:1"><button class="btn" id="addLoc" style="flex:none">Add</button></div></div>
     <div id="locs" class="group"></div>
   </section>
 
@@ -590,7 +588,8 @@ function render(){
       <button class="x" data-lhide="${esc(l.id)}">${l.hidden?'Show':'Hide'}</button>${l.hidden?`<button class="x ${armed?'armed':''}" data-ldel="${esc(l.id)}">${armed?'Tap to delete':'Delete'}</button>`:''}</div>`};
   $('#locs').innerHTML=locs.length?(visLocs.map(locRow).join('')||'<div class="empty" style="padding:12px">All spots are hidden.</div>')
     +(hidLocs.length?`<button class="btn ghost" data-act="toggle-hidden" style="width:100%">${ui.showHidden?'Hide hidden spots':`Show ${hidLocs.length} hidden spot${hidLocs.length===1?'':'s'}`}</button>`+(ui.showHidden?hidLocs.map(locRow).join(''):''):'')
-    :`<div class="empty">No locations yet. Add a park or spot above, then pick it on any trick or run.</div>`;
+    +`<button class="btn ghost" data-act="add-loc" style="width:100%">+ Add a location</button>`
+    :`<div class="empty">No locations yet. Add a skatepark or spot, then pick it on any trick or run.<br><button class="btn" data-act="add-loc">Add a location</button></div>`;
 
   $('#footnote').textContent=store.mode==='db'?'Synced through your family login, so it matches on every phone and laptop. Tap the selected skater for names, photos, backups and sign out.':'';
 }
@@ -886,7 +885,7 @@ document.addEventListener('click',e=>{
   if(b.dataset.act==='add-shoe'){shoeSheet();return}
   if(b.dataset.shoe){shoeSheet(b.dataset.shoe);return}
   if(b.dataset.board){boardSheet(b.dataset.board);return}
-  if(b.id==='addLoc'){addLoc();return}
+  if(b.dataset.act==='add-loc'){addLocSheet();return}
   if(b.dataset.ldel){delLoc(b.dataset.ldel);return}
   if(b.dataset.lhide){const l=state.locations.find(x=>x.id===b.dataset.lhide);if(l){const {id,...r}=l;const h=!l.hidden;store.put('locations',id,{...r,hidden:h});toast(h?`${l.name} hidden. Find it under Show hidden spots.`:`${l.name} is back on the home page`)}return}
   if(b.dataset.act==='arrange'){arrangeSheet();return}
@@ -1036,16 +1035,26 @@ function shoeSheet(id){
   });
 }
 function sortedLocs(){const o=x=>typeof x.order==='number'?x.order:1e9;return state.locations.slice().sort((a,b)=>(o(a)-o(b))||String(a.name).localeCompare(String(b.name)))}
-function addLoc(){
-  const i=$('#newLoc');const v=i.value.trim();if(!v){i.focus();return}
-  if(state.locations.some(l=>String(l.name).toLowerCase()===v.toLowerCase())){toast(`${v} is already on the list`);return}
-  store.put('locations',uid(),{name:v,created:Date.now()});i.value='';toast(`Added ${v}`);
+function addLocSheet(after){
+  openSheet(`<h2>Add a location</h2>
+    <div class="field"><label class="lbl" for="newLoc">Skatepark or spot</label><input id="newLoc" placeholder="e.g. Local skatepark, school stairs" autocomplete="off"></div>
+    <p class="err" id="newLocErr" hidden></p>
+    <div class="row"><button class="btn" id="addLoc">Add location</button><button class="btn ghost" id="addLocCancel">Cancel</button></div>`,s=>{
+    const i=s.querySelector('#newLoc'),err=s.querySelector('#newLocErr');
+    const go=()=>{const v=i.value.trim();if(!v){i.focus();return}
+      if(state.locations.some(l=>String(l.name).toLowerCase()===v.toLowerCase())){err.textContent=`${v} is already on the list.`;err.hidden=false;return}
+      const id=uid();store.put('locations',id,{name:v,created:Date.now()});toast(`Added ${v}`);
+      if(after)after(id);else{let n=0;const open=()=>{if(state.locations.some(l=>l.id===id))locSheet(id);else if(++n<40)setTimeout(open,50);else closeSheet()};open()}};
+    s.querySelector('#addLoc').onclick=go;i.addEventListener('keydown',e=>{if(e.key==='Enter')go()});
+    i.addEventListener('input',()=>{err.hidden=true});
+    s.querySelector('#addLocCancel').onclick=closeSheet;
+    setTimeout(()=>i.focus(),50);
+  });
 }
 function delLoc(id){
   if(pendingLocDel!==id){pendingLocDel=id;render();clearTimeout(delLoc.t);delLoc.t=setTimeout(()=>{pendingLocDel=null;render()},4000);return}
   pendingLocDel=null;store.del('locations',id);toast('Location deleted');
 }
-document.getElementById('newLoc').addEventListener('keydown',e=>{if(e.key==='Enter')addLoc()});
 
 /* ---------- runs ---------- */
 function nowLocal(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`}
