@@ -101,6 +101,10 @@ section{display:flex;flex-direction:column;gap:10px}
 h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .filters{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
 .chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-family:var(--label);font-weight:600;font-size:14px;white-space:nowrap}
+.lchip{border-style:dashed}
+.lchip[aria-pressed="true"]{border-style:solid}
+.lchip small{font-family:var(--label);opacity:.65;margin-left:2px}
+#locfilters{margin-bottom:-4px}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 
 .group{display:flex;flex-direction:column;gap:6px}
@@ -256,6 +260,7 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 
   <section>
     <div class="sh" style="align-items:center"><h2>Tricks</h2><span class="lbl" id="trickCount"></span></div>
+    <div class="filters" id="locfilters" aria-label="Filter by location"></div>
     <div class="filters" id="filters"></div>
     <div id="tricks"></div>
   </section>
@@ -317,9 +322,9 @@ const fullName=t=>t.stance&&t.stance!=='Regular'&&!t.name.toLowerCase().startsWi
 let state={riders:{a:{name:'Skater 1'},b:{name:'Skater 2'}},tricks:[],goals:[],locations:[],runs:[],boards:[],shoes:[]};
 let sheetOnClose=null;
 let pendingLocDel=null;
-let ui={rider:'a',filter:'all'};
-try{const s=JSON.parse(localStorage.getItem('skate-ui')||'{}');if(s.rider)ui.rider=s.rider;}catch(e){}
-const saveUI=()=>{try{localStorage.setItem('skate-ui',JSON.stringify({rider:ui.rider}))}catch(e){}};
+let ui={rider:'a',filter:'all',loc:'all'};
+try{const s=JSON.parse(localStorage.getItem('skate-ui')||'{}');if(s.rider)ui.rider=s.rider;if(s.loc)ui.loc=s.loc;}catch(e){}
+const saveUI=()=>{try{localStorage.setItem('skate-ui',JSON.stringify({rider:ui.rider,loc:ui.loc}))}catch(e){}};
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -465,14 +470,18 @@ function render(){
   $('#ladder').hidden=!mine.length;
 
   $('#filters').innerHTML=[['all','All'],...CAT_NAMES.map(n=>[n,n])].map(([k,l])=>`<button class="chip" data-f="${esc(k)}" aria-pressed="${ui.filter===k}">${esc(l)}</button>`).join('');
-  const shown=mine.filter(t=>ui.filter==='all'||t.cat===ui.filter);
+  if(ui.loc!=='all'&&!state.locations.some(l=>l.id===ui.loc)&&state.locations.length)ui.loc='all';
+  const lcount=id=>mine.filter(t=>t.locId===id).length;
+  $('#locfilters').hidden=!state.locations.length;
+  $('#locfilters').innerHTML=[['all','All spots',mine.length],...sortedLocs().map(l=>[l.id,l.name,lcount(l.id)])].map(([k,l,n])=>`<button class="chip lchip" data-lf="${esc(k)}" aria-pressed="${ui.loc===k}">${esc(l)} <small>${n}</small></button>`).join('');
+  const shown=mine.filter(t=>(ui.filter==='all'||t.cat===ui.filter)&&(ui.loc==='all'||t.locId===ui.loc));
   $('#trickCount').textContent=mine.length?`${mine.length} on the list`:'';
 
   const name=esc(state.riders[R]?.name||'this skater');
   if(!mine.length){
     $('#tricks').innerHTML=`<div class="empty">No tricks yet for ${name}.<br>Pick from the trick list or add your own.<br><button class="btn" data-act="add-trick">Add tricks</button></div>`;
   }else if(!shown.length){
-    $('#tricks').innerHTML=`<div class="empty">Nothing in ${esc(ui.filter)} yet.<br><button class="btn" data-act="add-trick">Add tricks</button></div>`;
+    $('#tricks').innerHTML=`<div class="empty">Nothing ${ui.filter!=='all'?'in '+esc(ui.filter)+' ':''}${ui.loc!=='all'?'at '+esc(locName(ui.loc))+' ':''}yet.<br><button class="btn" data-act="add-trick">Add tricks</button></div>`;
   }else{
     const order=['working','landed','locked','wish'];
     $('#tricks').innerHTML=order.map(k=>{
@@ -790,6 +799,7 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b||b.closest('#sheetHost'))return;
   if(b.dataset.r){if(b.dataset.r===ui.rider){namesSheet();return}ui.rider=b.dataset.r;saveUI();render();return}
   if(b.dataset.f){ui.filter=b.dataset.f;render();return}
+  if(b.dataset.lf){ui.loc=b.dataset.lf;saveUI();if(ui.loc!=='all'){ui.lastLoc=ui.loc;ui.lastObs=''}render();return}
   if(b.dataset.up){levelUp(b.dataset.up);return}
   if(b.dataset.edit){editTrick(b.dataset.edit);return}
   if(b.dataset.done){toggleGoal(b.dataset.done);return}
