@@ -117,6 +117,9 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .goalrow{display:flex;align-items:flex-start;gap:12px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer}
 .goalrow input{width:24px;height:24px;margin:0;flex:none;accent-color:var(--rider)}
 .goalrow>span{display:flex;flex-direction:column;gap:2px}
+.tthumb{width:44px;height:44px;border-radius:10px;object-fit:cover;flex:none;display:block}
+.tphoto img{display:block;width:100%;max-height:340px;object-fit:cover;border-radius:12px;border:1px solid var(--line)}
+.tphoto img.loading{filter:blur(6px)}
 .gbox{flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:var(--label);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);cursor:pointer}
 .gbox input{width:22px;height:22px;margin:0;accent-color:var(--rider);cursor:pointer}
 .trick .go{flex:none;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 10px;font-family:var(--label);font-weight:700;font-size:14px;white-space:nowrap}
@@ -413,8 +416,10 @@ function startSync(){
   subs.push(db.collection('shoes').onSnapshot(s=>{state.shoes=rows(s);render()},fail));
 }
 
-function exportData(){
-  const out={app:'skate-log',version:1,exported:new Date().toISOString(),riders:state.riders,background:state.bg||'',tricks:state.tricks,goals:state.goals,locations:state.locations,runs:state.runs,boards:state.boards,shoes:state.shoes};
+async function exportData(){
+  let trickPhotos=[];
+  if(store.db){toast('Preparing backup…');try{const snap=await store.db.collection('trickPhotos').get();trickPhotos=snap.docs.map(d=>({...d.data(),id:d.id}))}catch(e){toast('Trick photos couldn’t be included. Check your connection.')}}
+  const out={trickPhotos,app:'skate-log',version:1,exported:new Date().toISOString(),riders:state.riders,background:state.bg||'',tricks:state.tricks,goals:state.goals,locations:state.locations,runs:state.runs,boards:state.boards,shoes:state.shoes};
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,1)],{type:'application/json'}));
   a.download=`skate-log-backup-${today()}.json`;document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
@@ -429,7 +434,9 @@ async function importData(file){
   toast(`Importing ${ops.length} items…`);
   try{
     for(let i=0;i<ops.length;i+=400){const b=store.db.batch();ops.slice(i,i+400).forEach(([c,id,data])=>b.set(store.db.doc(c+'/'+id),data));await b.commit()}
-    toast(`Imported ${ops.length} items`);
+    const tp=(d.trickPhotos||[]).filter(x=>x&&x.id);
+    for(const {id,...rest} of tp)await store.db.doc('trickPhotos/'+id).set(rest);
+    toast(`Imported ${ops.length+tp.length} items`);
   }catch(e){saveErr(e)}
 }
 
@@ -511,6 +518,7 @@ function trickRow(t){
   const meta=[t.cat||'',placed(t)?'on '+t.obstacle+' at '+locName(t.locId):'',t.landedAt?'First landed '+fmtDate(t.landedAt):''].filter(Boolean).join(' · ');
   const next=STATUSES[i+1];
   return `<div class="trick">
+    ${t.thumb?`<img class="tthumb" src="${esc(t.thumb)}" alt="">`:''}
     <span class="pips" data-s="${esc(t.status)}" aria-label="${STATUSES[i].label}">${[0,1,2,3].map(n=>`<i class="${n<=i?'on':''}"></i>`).join('')}</span>
     <button class="t" data-edit="${t.id}" style="border:0;background:none;padding:0;text-align:left"><div class="tn">${esc(fullName(t))}</div>${meta||t.notes?`<div class="tm">${esc(meta)}${t.notes?(meta?' · ':'')+esc(t.notes):''}</div>`:''}${placed(t)?'':'<div class="tm needs">Needs a location and obstacle</div>'}</button>
     <label class="gbox" title="Make this a goal"><input type="checkbox" data-goal="${esc(t.id)}" ${goalFor(t.id)?'checked':''}><span>Goal</span></label>
@@ -655,6 +663,8 @@ function editTrick(id){
   openSheet(`<h2>${esc(fullName(t))}</h2>
     <div class="field"><span class="lbl">Where it's at</span><div class="seg" id="st">${STATUSES.map(s=>`<button data-s="${s.k}">${s.label}</button>`).join('')}</div></div>
     <label class="goalrow"><input type="checkbox" id="tgoal" ${goalFor(t.id)?'checked':''}><span><b>Make this a goal</b><span class="note">Shows in Goals and ticks itself off when it's landed.</span></span></label>
+    <div class="field"><span class="lbl">Photo</span><div class="tphoto" id="tph"></div>
+      <div class="row"><label class="btn ghost filebtn" for="tpf" id="tpfL">Add photo</label><input id="tpf" type="file" accept="image/*" hidden><button class="btn ghost" id="tprm">Remove photo</button></div></div>
     <div class="field"><label class="lbl" for="tname">Name</label><input id="tname" value="${esc(fullName(t))}"></div>
     <div class="field"><label class="lbl" for="tcat">Type</label><select id="tcat">${CAT_NAMES.map(c=>`<option ${c===t.cat?'selected':''}>${esc(c)}</option>`).join('')}<option value="" ${t.cat&&!CAT_NAMES.includes(t.cat)?'':(!t.cat?'selected':'')}>Other</option></select></div>
     <div id="twhere"></div>
@@ -663,12 +673,22 @@ function editTrick(id){
     <div class="row"><button class="btn" id="save">Save</button><button class="btn ghost" id="cancel">Cancel</button></div>
     <button class="btn danger" id="del">Delete trick</button>`,s=>{
     const mark=()=>{s.querySelectorAll('#st button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.s===st))};mark();
+    const ph={full:'',thumb:t.thumb||'',changed:false,loading:!!t.thumb};
+    const drawPh=()=>{const src=ph.full||ph.thumb;s.querySelector('#tph').innerHTML=src?`<img src="${esc(src)}" alt="Photo of ${esc(fullName(t))}" class="${!ph.full&&ph.loading?'loading':''}">`:'<span class="note">No photo yet. Add one of the trick, the obstacle or the landing.</span>';
+      s.querySelector('#tpfL').textContent=src?'Change photo':'Add photo';s.querySelector('#tprm').hidden=!src};
+    drawPh();
+    if(t.thumb&&store.db)store.db.doc('trickPhotos/'+t.id).get().then(d=>{if(!ph.changed){ph.full=d.exists?(d.data().photo||''):'';ph.loading=false;drawPh()}}).catch(()=>{ph.loading=false;drawPh()});
+    s.querySelector('#tpf').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+      try{ph.full=await shrinkImg(f,1000,false,0.74);ph.thumb=await shrinkImg(f,160,true,0.7);ph.changed=true;ph.loading=false;drawPh()}catch(err){toast('That photo couldn’t be opened. Try a different one.')}});
+    s.querySelector('#tprm').onclick=()=>{ph.full='';ph.thumb='';ph.changed=true;ph.loading=false;drawPh()};
     s.querySelector('#st').onclick=e=>{const b=e.target.closest('[data-s]');if(b){st=b.dataset.s;if(SIDX[st]>=2&&!s.querySelector('#tland').value)s.querySelector('#tland').value=today();mark()}};
     where=mountWhere(s.querySelector('#twhere'),{locId:t.locId,obstacle:t.obstacle});
     s.querySelector('#cancel').onclick=closeSheet;
     s.querySelector('#save').onclick=()=>{
       const w=where.get();if(!w.locId||!w.obstacle){toast('Pick a location and an obstacle');s.querySelector('#twhere').scrollIntoView({block:'center'});return}
       const {id:_,spots:_s,locIds:_l,...rest}=t;
+      if(ph.changed&&store.db){if(ph.full)store.db.doc('trickPhotos/'+t.id).set({photo:ph.full,rider:t.rider}).catch(saveErr);else store.db.doc('trickPhotos/'+t.id).delete().catch(()=>{})}
+      rest.thumb=ph.changed?ph.thumb:(t.thumb||'');
       store.put('tricks',t.id,{...rest,name:s.querySelector('#tname').value.trim()||fullName(t),cat:s.querySelector('#tcat').value,stance:'',locId:w.locId,obstacle:w.obstacle,status:st,landedAt:s.querySelector('#tland').value||'',notes:s.querySelector('#tnotes').value.trim(),updated:Date.now()});
       const wantGoal=s.querySelector('#tgoal').checked,g=goalFor(t.id),land=s.querySelector('#tland').value;
       if(wantGoal&&!g){const done=SIDX[st]>=2;const nt={...t,name:s.querySelector('#tname').value.trim()||fullName(t),stance:'',locId:w.locId,obstacle:w.obstacle};
@@ -677,7 +697,7 @@ function editTrick(id){
       else syncTrickGoal(t.id,st,land);
       closeSheet();
     };
-    s.querySelector('#del').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('tricks',t.id);closeSheet();toast('Trick deleted')};
+    s.querySelector('#del').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('tricks',t.id);if(t.thumb&&store.db)store.db.doc('trickPhotos/'+t.id).delete().catch(()=>{});closeSheet();toast('Trick deleted')};
   });
 }
 function levelUp(id){
@@ -712,6 +732,17 @@ function toggleGoal(id){
   const g=state.goals.find(x=>x.id===id);if(!g)return;const {id:_,...r}=g;
   store.put('goals',id,{...r,done:!g.done,doneAt:!g.done?today():''});
   if(!g.done)toast('Goal smashed!');
+}
+function shrinkImg(file,max,square,q){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file);const img=new Image();
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('bad'))};
+    img.onload=()=>{const W=img.naturalWidth,H=img.naturalHeight,c=document.createElement('canvas'),x=c.getContext('2d');
+      if(square){const m=Math.min(W,H);c.width=c.height=max;x.drawImage(img,(W-m)/2,(H-m)/2,m,m,0,0,max,max)}
+      else{const k=Math.min(1,max/Math.max(W,H));c.width=Math.round(W*k);c.height=Math.round(H*k);x.drawImage(img,0,0,c.width,c.height)}
+      URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',q))};
+    img.src=url;
+  });
 }
 function shrinkPhoto(file){
   return new Promise((res,rej)=>{
