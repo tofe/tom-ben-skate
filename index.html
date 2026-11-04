@@ -180,6 +180,7 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .gearbar{justify-content:space-between;align-items:center;flex-wrap:nowrap}
 .gearempty{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px dashed var(--line);border-radius:12px;padding:8px 8px 8px 12px;color:var(--muted);font-size:15px}
 .btn.sm{padding:7px 14px;font-size:14px;flex:none}
+.btn:disabled{opacity:.45;cursor:default}
 .row .btn.sm{flex:none}
 .bcard{display:flex;flex-direction:column;align-items:flex-start;gap:8px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--rider);border-radius:var(--r);padding:14px 16px}
 .bcard .bt{font-family:var(--display);font-size:22px;line-height:1.1;overflow-wrap:anywhere}
@@ -1174,7 +1175,7 @@ function defSheet(latest,back){
   let def=defOf(latest);
   if(!def){const defId='def-'+latest.id;def={id:defId,rider:latest.rider,name:latest.name||'Run',locId:latest.locId||'',items:stripItems(latest.items)}}
   const d={name:def.name||'Run',locId:def.locId||'',items:stripItems(def.items)};
-  const myTricks=()=>state.tricks.filter(t=>t.rider===def.rider).sort((a,b)=>((b.locId===d.locId)-(a.locId===d.locId))||fullName(a).localeCompare(fullName(b)));
+  const myTricks=()=>d.locId?state.tricks.filter(t=>t.rider===def.rider&&t.locId===d.locId).sort((a,b)=>String(a.obstacle||'').localeCompare(String(b.obstacle||''))||fullName(a).localeCompare(fullName(b))):[];
   openSheet(`<h2>Edit run</h2>
     <p class="note" style="margin:0">Changes apply to new tries. Past tries keep their results.</p>
     <div class="field"><label class="lbl" for="dname">Name</label><input id="dname" value="${esc(d.name)}"></div>
@@ -1190,7 +1191,8 @@ function defSheet(latest,back){
         <span class="mv"><button data-mv="${i}" data-d="-1" aria-label="Move ${esc(it.name)} up" ${i===0?'disabled':''}>▲</button><button data-mv="${i}" data-d="1" aria-label="Move ${esc(it.name)} down" ${i===d.items.length-1?'disabled':''}>▼</button></span>
         <button class="rm" data-rm="${i}">Remove</button></div>`).join(''):'<div class="empty">No tricks in this run yet.</div>';
       const list=myTricks();
-      s.querySelector('#dadd').innerHTML=list.length?list.map(t=>`<option value="${esc(t.id)}">${esc(fullName(t))}${t.obstacle?' · '+esc(t.obstacle):''}${t.locId&&t.locId!==d.locId&&locName(t.locId)?' @ '+esc(locName(t.locId)):''}</option>`).join(''):'<option value="">Add tricks to the trick list first</option>';
+      s.querySelector('#dadd').innerHTML=list.length?list.map(t=>`<option value="${esc(t.id)}">${esc(fullName(t))}${t.obstacle?' · '+esc(t.obstacle):''}</option>`).join(''):`<option value="">${d.locId?'No tricks at '+esc(locName(d.locId))+' yet':'Choose a location first'}</option>`;
+      s.querySelector('#dadd').disabled=!list.length;s.querySelector('#daddBtn').disabled=!list.length;
     };
     draw();
     s.querySelector('#ditems').onclick=e=>{const b=e.target.closest('button');if(!b)return;
@@ -1316,7 +1318,7 @@ function runSheet(id,initial,back){
       store.put('runDefs',d.defId,{...base,name:d.name,locId:d.locId,items:stripItems(d.items),updated:Date.now()});structChanged=false}};
   const save=()=>{clearTimeout(timer);timer=setTimeout(flush,400)};
   const saveS=()=>{structChanged=true;save()};
-  const myTricks=()=>state.tricks.filter(t=>t.rider===d.rider).sort((a,b)=>((b.locId===d.locId)-(a.locId===d.locId))||fullName(a).localeCompare(fullName(b))||String(a.obstacle||'').localeCompare(String(b.obstacle||'')));
+  const myTricks=()=>d.locId?state.tricks.filter(t=>t.rider===d.rider&&t.locId===d.locId).sort((a,b)=>String(a.obstacle||'').localeCompare(String(b.obstacle||''))||fullName(a).localeCompare(fullName(b))):[];
   const who=esc(state.riders[d.rider]?.name||'they');
   const comp=d.compId&&state.comps.find(c=>c.id===d.compId);const round=comp&&(comp.rounds||[]).find(r=>r.id===d.roundId);
   openSheet(`<h2>Run</h2>
@@ -1340,7 +1342,8 @@ function runSheet(id,initial,back){
         <span class="mv"><button data-mv="${i}" data-d="-1" aria-label="Move ${esc(it.name)} up" ${i===0?'disabled':''}>▲</button><button data-mv="${i}" data-d="1" aria-label="Move ${esc(it.name)} down" ${i===d.items.length-1?'disabled':''}>▼</button></span>
         <button class="rm" data-rm="${i}">Remove</button></div>`).join(''):`<div class="empty">Add tricks below in the order ${who} will skate them.</div>`;
       const list=myTricks();
-      s.querySelector('#radd').innerHTML=list.length?list.map(t=>`<option value="${esc(t.id)}">${esc(fullName(t))}${t.obstacle?' · '+esc(t.obstacle):''}${t.locId&&t.locId!==d.locId&&locName(t.locId)?' @ '+esc(locName(t.locId)):''}</option>`).join(''):'<option value="">Add tricks to the trick list first</option>';
+      s.querySelector('#radd').innerHTML=list.length?list.map(t=>`<option value="${esc(t.id)}">${esc(fullName(t))}${t.obstacle?' · '+esc(t.obstacle):''}</option>`).join(''):`<option value="">${d.locId?'No tricks at '+esc(locName(d.locId))+' yet':'Choose a location first'}</option>`;
+      s.querySelector('#radd').disabled=!list.length;s.querySelector('#raddBtn').disabled=!list.length;
     };
     draw();
     s.querySelector('#ritems').onclick=e=>{const b=e.target.closest('button');if(!b)return;
