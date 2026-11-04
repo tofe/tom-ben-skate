@@ -161,7 +161,8 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .marks i.land{background:var(--locked)} .marks i.miss{background:var(--miss)}
 .ri{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
 .ri .num{font-family:var(--label);font-weight:700;color:var(--muted);width:18px;text-align:center;flex:none;font-variant-numeric:tabular-nums}
-.ri .n{flex:1;min-width:0;font-weight:700;overflow-wrap:anywhere}
+.ri .n{flex:1;min-width:0;font-weight:700;overflow-wrap:anywhere;display:flex;flex-direction:column;gap:4px}
+.ri .robs{font:inherit;font-weight:500;font-size:16px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:5px 8px;max-width:100%}
 .mk{flex:none;width:44px;height:44px;border-radius:10px;border:2px solid var(--line);background:var(--surface);font-size:20px;font-weight:700;display:grid;place-items:center;padding:0}
 .mk.ok{color:var(--locked)} .mk.no{color:var(--miss)}
 .mk.ok[aria-pressed="true"]{background:var(--locked);border-color:var(--locked);color:#fff}
@@ -756,7 +757,9 @@ function runSheet(id,initial){
     const draw=()=>{
       const sc=runScore(d);
       s.querySelector('#rscore').textContent=d.items.length?`${sc.land} landed · ${sc.miss} missed`:'';
-      s.querySelector('#ritems').innerHTML=d.items.length?d.items.map((it,i)=>`<div class="ri"><span class="num">${i+1}</span><span class="n">${esc(it.name)}</span>
+      const robs=obstaclesOf(d.locId);
+      const obsSel=(it,i)=>{const list=[...robs,...(it.obstacle&&!robs.includes(it.obstacle)?[it.obstacle]:[])];if(!list.length)return'';return `<select class="robs" data-oi="${i}" aria-label="Obstacle for ${esc(it.name)}"><option value="">No obstacle</option>${list.map(o=>`<option ${o===it.obstacle?'selected':''}>${esc(o)}</option>`).join('')}</select>`};
+      s.querySelector('#ritems').innerHTML=d.items.length?d.items.map((it,i)=>`<div class="ri"><span class="num">${i+1}</span><span class="n">${esc(it.name)}${obsSel(it,i)}</span>
         <button class="mk ok" data-i="${i}" data-v="land" aria-pressed="${it.res==='land'}" aria-label="Landed">✓</button>
         <button class="mk no" data-i="${i}" data-v="miss" aria-pressed="${it.res==='miss'}" aria-label="Missed">✕</button>
         <button class="rm" data-rm="${i}">Remove</button></div>`).join(''):`<div class="empty">Add tricks below in the order ${who} will skate them.</div>`;
@@ -767,12 +770,15 @@ function runSheet(id,initial){
     s.querySelector('#ritems').onclick=e=>{const b=e.target.closest('button');if(!b)return;
       if(b.dataset.rm!==undefined){d.items.splice(+b.dataset.rm,1);draw();save();return}
       const it=d.items[+b.dataset.i];if(!it)return;it.res=it.res===b.dataset.v?'':b.dataset.v;draw();save()};
-    s.querySelector('#raddBtn').onclick=()=>{const t=state.tricks.find(x=>x.id===s.querySelector('#radd').value);if(!t)return;d.items.push({tid:t.id,name:fullName(t),res:''});draw();save()};
+    s.querySelector('#raddBtn').onclick=()=>{const t=state.tricks.find(x=>x.id===s.querySelector('#radd').value);if(!t)return;
+      const here=spotsOf(t).filter(sp=>sp.locId===d.locId&&sp.obstacle).map(sp=>sp.obstacle);
+      d.items.push({tid:t.id,name:fullName(t),res:'',obstacle:here.length===1?here[0]:''});draw();save()};
+    s.querySelector('#ritems').addEventListener('change',e=>{const el=e.target.closest('select.robs');if(!el)return;const it=d.items[+el.dataset.oi];if(it){it.obstacle=el.value;save()}});
     s.querySelector('#rname').addEventListener('input',e=>{d.name=e.target.value;save()});
     s.querySelector('#rat').addEventListener('change',e=>{d.at=e.target.value;save()});
-    s.querySelector('#rloc').addEventListener('change',e=>{d.locId=e.target.value;save()});
+    s.querySelector('#rloc').addEventListener('change',e=>{d.locId=e.target.value;const ok=obstaclesOf(d.locId);d.items.forEach(it=>{if(it.obstacle&&!ok.includes(it.obstacle))it.obstacle=''});draw();save()});
     s.querySelector('#rdone').onclick=closeSheet;
-    s.querySelector('#ragain').onclick=()=>{if(timer)flush();const nid=uid();const nd={...JSON.parse(JSON.stringify(d)),at:nowLocal(),items:d.items.map(i=>({tid:i.tid,name:i.name,res:''})),created:Date.now(),updated:Date.now()};sheetOnClose=null;chain.then(()=>store.put('runs',nid,nd));runSheet(nid,nd);toast('New attempt started')};
+    s.querySelector('#ragain').onclick=()=>{if(timer)flush();const nid=uid();const nd={...JSON.parse(JSON.stringify(d)),at:nowLocal(),items:d.items.map(i=>({tid:i.tid,name:i.name,res:'',obstacle:i.obstacle||''})),created:Date.now(),updated:Date.now()};sheetOnClose=null;chain.then(()=>store.put('runs',nid,nd));runSheet(nid,nd);toast('New attempt started')};
     s.querySelector('#rdel').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}clearTimeout(timer);timer=null;sheetOnClose=null;chain.then(()=>store.del('runs',id));closeSheet();toast('Run deleted')};
   });
   sheetOnClose=()=>{if(timer)flush()};
