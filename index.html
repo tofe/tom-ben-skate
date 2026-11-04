@@ -271,7 +271,6 @@ const STAIR_TRICKS=[...GAP_TRICKS,'50-50 handrail','Boardslide handrail','Lipsli
 CATS['Death Gap']=GAP_TRICKS;
 ['2 Stair','3 Stair','5 Stair','6 Stair','7 Stair','Street Stairs'].forEach(k=>CATS[k]=STAIR_TRICKS);
 const CAT_NAMES=Object.keys(CATS);
-const OBSTACLES=['Bank','Bowl','Box','Coping','Curb','Euro gap','Flat bar','Flat ground','Funbox','Gap','Handrail','Hip','Hubba','Kicker','Ledge','Manual pad','Mini ramp','Pyramid','Quarter pipe','Rail','Stairs','Wall'];
 const locIdsOf=t=>Array.isArray(t.locIds)?t.locIds:(t.locId?[t.locId]:[]);
 const fullName=t=>t.stance&&t.stance!=='Regular'&&!t.name.toLowerCase().startsWith(t.stance.toLowerCase())?t.stance+' '+t.name.charAt(0).toLowerCase()+t.name.slice(1):t.name;
 
@@ -442,7 +441,7 @@ function render(){
 function trickRow(t){
   const i=SIDX[t.status]??0;
   const lnames=locIdsOf(t).map(id=>state.locations.find(l=>l.id===id)?.name).filter(Boolean);
-  const meta=[t.cat||'',t.obstacle?'on '+t.obstacle:'',lnames.length?'at '+lnames.join(', '):'',t.landedAt?'First landed '+fmtDate(t.landedAt):''].filter(Boolean).join(' · ');
+  const meta=[t.cat||'',lnames.length?'at '+lnames.join(', '):'',t.landedAt?'First landed '+fmtDate(t.landedAt):''].filter(Boolean).join(' · ');
   const next=STATUSES[i+1];
   return `<div class="trick">
     <span class="pips" data-s="${esc(t.status)}" aria-label="${STATUSES[i].label}">${[0,1,2,3].map(n=>`<i class="${n<=i?'on':''}"></i>`).join('')}</span>
@@ -541,7 +540,6 @@ function editTrick(id){
     <div class="field"><span class="lbl">Where it's at</span><div class="seg" id="st">${STATUSES.map(s=>`<button data-s="${s.k}">${s.label}</button>`).join('')}</div></div>
     <div class="field"><label class="lbl" for="tname">Name</label><input id="tname" value="${esc(fullName(t))}"></div>
     <div class="field"><label class="lbl" for="tcat">Type</label><select id="tcat">${CAT_NAMES.map(c=>`<option ${c===t.cat?'selected':''}>${esc(c)}</option>`).join('')}<option value="" ${t.cat&&!CAT_NAMES.includes(t.cat)?'':(!t.cat?'selected':'')}>Other</option></select></div>
-    <div class="field"><label class="lbl" for="tobs">Obstacle (optional)</label><input id="tobs" list="obsList" value="${esc(t.obstacle||'')}" placeholder="e.g. Hubba, flat bar, quarter pipe" autocomplete="off"><datalist id="obsList">${[...new Set([...OBSTACLES,...state.tricks.map(x=>x.obstacle).filter(Boolean)])].sort((a,b)=>a.localeCompare(b)).map(o=>`<option value="${esc(o)}"></option>`).join('')}</datalist></div>
     <div class="field"><span class="lbl" id="tlocL">Locations</span><div class="filters" id="tloc" role="group" aria-labelledby="tlocL" style="flex-wrap:wrap">${sortedLocs().map(l=>`<button class="chip" data-l="${esc(l.id)}" aria-pressed="${locIdsOf(t).includes(l.id)}">${esc(l.name)}</button>`).join('')}</div>${state.locations.length?'<span class="note">Tap every spot where this trick has been done.</span>':'<span class="note">Add spots in the Locations section to pick them here.</span>'}</div>
     <div class="field"><label class="lbl" for="tland">First landed</label><input id="tland" type="date" value="${esc(t.landedAt||'')}"></div>
     <div class="field"><label class="lbl" for="tnotes">Notes</label><textarea id="tnotes" placeholder="Where, how it felt, what to fix next">${esc(t.notes||'')}</textarea></div>
@@ -553,7 +551,7 @@ function editTrick(id){
     s.querySelector('#cancel').onclick=closeSheet;
     s.querySelector('#save').onclick=()=>{
       const {id:_,...rest}=t;
-      store.put('tricks',t.id,{...rest,name:s.querySelector('#tname').value.trim()||fullName(t),cat:s.querySelector('#tcat').value,stance:'',locId:'',locIds:[...locSel],obstacle:s.querySelector('#tobs').value.trim(),status:st,landedAt:s.querySelector('#tland').value||'',notes:s.querySelector('#tnotes').value.trim(),updated:Date.now()});
+      store.put('tricks',t.id,{...rest,name:s.querySelector('#tname').value.trim()||fullName(t),cat:s.querySelector('#tcat').value,stance:'',locId:'',locIds:[...locSel],status:st,landedAt:s.querySelector('#tland').value||'',notes:s.querySelector('#tnotes').value.trim(),updated:Date.now()});
       closeSheet();
     };
     s.querySelector('#del').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('tricks',t.id);closeSheet();toast('Trick deleted')};
