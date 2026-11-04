@@ -114,6 +114,8 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .trick .t{flex:1;min-width:0}
 .trick .tn{font-weight:700;font-size:17px;overflow-wrap:anywhere}
 .trick .tm{font-size:14px;color:var(--muted);overflow-wrap:anywhere}
+.gbox{flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:var(--label);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);cursor:pointer}
+.gbox input{width:22px;height:22px;margin:0;accent-color:var(--rider);cursor:pointer}
 .trick .go{flex:none;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 10px;font-family:var(--label);font-weight:700;font-size:14px;white-space:nowrap}
 .pips{display:flex;gap:3px;flex:none}
 .pips i{width:7px;height:18px;border-radius:2px;background:var(--line)}
@@ -508,8 +510,21 @@ function trickRow(t){
   return `<div class="trick">
     <span class="pips" data-s="${esc(t.status)}" aria-label="${STATUSES[i].label}">${[0,1,2,3].map(n=>`<i class="${n<=i?'on':''}"></i>`).join('')}</span>
     <button class="t" data-edit="${t.id}" style="border:0;background:none;padding:0;text-align:left"><div class="tn">${esc(fullName(t))}</div>${meta||t.notes?`<div class="tm">${esc(meta)}${t.notes?(meta?' · ':'')+esc(t.notes):''}</div>`:''}${placed(t)?'':'<div class="tm needs">Needs a location and obstacle</div>'}</button>
+    <label class="gbox" title="Make this a goal"><input type="checkbox" data-goal="${esc(t.id)}" ${goalFor(t.id)?'checked':''}><span>Goal</span></label>
     ${next?`<button class="go" data-up="${t.id}">${next.k==='landed'?'Landed!':next.k==='locked'?'Lock in':'Start'}</button>`:''}
   </div>`;
+}
+function goalFor(tid){return state.goals.find(g=>g.trickId===tid)}
+function goalText(t){return 'Land '+fullName(t)+(t.obstacle?' on '+t.obstacle:'')+(locName(t.locId)?' at '+locName(t.locId):'')}
+function goalLabel(g){const t=g.trickId&&state.tricks.find(x=>x.id===g.trickId);return t?goalText(t):(g.text||'')}
+function toggleTrickGoal(tid,on){
+  const t=state.tricks.find(x=>x.id===tid);if(!t)return;const g=goalFor(tid);
+  if(on&&!g){const done=SIDX[t.status]>=2;store.put('goals',uid(),{rider:t.rider,trickId:t.id,text:goalText(t),done,doneAt:done?(t.landedAt||today()):'',due:'',created:Date.now()});toast('Added to goals')}
+  else if(!on&&g){store.del('goals',g.id);toast('Removed from goals')}
+}
+function syncTrickGoal(tid,status,landedAt){
+  const g=goalFor(tid);if(!g)return;const done=SIDX[status]>=2;
+  if(done!==!!g.done){const {id:_,...r}=g;store.put('goals',g.id,{...r,done,doneAt:done?(landedAt||today()):''});if(done)toast('Goal smashed!')}
 }
 function goalRow(g){
   let when='';
@@ -517,7 +532,7 @@ function goalRow(g){
   else if(g.due){const d=daysTo(g.due);when=d<0?`<span class="late">${-d} day${d===-1?'':'s'} past ${fmtDate(g.due)}</span>`:d===0?'Due today':`By ${fmtDate(g.due)} · ${d} day${d===1?'':'s'} left`}
   return `<div class="goal ${g.done?'done':''}">
     <button class="chk" data-done="${g.id}" aria-label="${g.done?'Mark not done':'Mark done'}">${g.done?'✓':''}</button>
-    <div class="t"><div class="gt">${esc(g.text)}</div>${when?`<div class="gm">${when}</div>`:''}</div>
+    <div class="t"><div class="gt">${esc(goalLabel(g))}</div>${when?`<div class="gm">${when}</div>`:''}</div>
     <button class="x" data-gedit="${g.id}">Edit</button>
   </div>`;
 }
@@ -651,6 +666,7 @@ function editTrick(id){
       const w=where.get();if(!w.locId||!w.obstacle){toast('Pick a location and an obstacle');s.querySelector('#twhere').scrollIntoView({block:'center'});return}
       const {id:_,spots:_s,locIds:_l,...rest}=t;
       store.put('tricks',t.id,{...rest,name:s.querySelector('#tname').value.trim()||fullName(t),cat:s.querySelector('#tcat').value,stance:'',locId:w.locId,obstacle:w.obstacle,status:st,landedAt:s.querySelector('#tland').value||'',notes:s.querySelector('#tnotes').value.trim(),updated:Date.now()});
+      syncTrickGoal(t.id,st,s.querySelector('#tland').value);
       closeSheet();
     };
     s.querySelector('#del').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('tricks',t.id);closeSheet();toast('Trick deleted')};
@@ -663,19 +679,20 @@ function levelUp(id){
   const row={...rest,status:ns,updated:Date.now()};
   if(ns==='landed'&&!t.landedAt)row.landedAt=today();
   store.put('tricks',id,row);
+  syncTrickGoal(id,ns,row.landedAt);
   toast(ns==='landed'?`${t.name} landed! 🛹`:ns==='locked'?`${t.name} locked in`:`Working on ${t.name}`);
 }
 
 function goalSheet(id){
   const g=id?state.goals.find(x=>x.id===id):null;let confirmDel=false;
   openSheet(`<h2>${g?'Edit goal':'New goal for '+esc(state.riders[ui.rider].name)}</h2>
-    <div class="field"><label class="lbl" for="gtext">Goal</label><input id="gtext" value="${esc(g?.text||'')}" placeholder="e.g. Land a kickflip at the park"></div>
+    <div class="field"><label class="lbl" for="gtext">Goal</label><input id="gtext" value="${esc(g?goalLabel(g):'')}" placeholder="e.g. Land a kickflip at the park" ${g&&g.trickId?'readonly':''}>${g&&g.trickId?'<span class="note">Linked to a trick. It ticks itself off when the trick is landed.</span>':''}</div>
     <div class="field"><label class="lbl" for="gdue">Target date (optional)</label><input id="gdue" type="date" value="${esc(g?.due||'')}"></div>
     <div class="row"><button class="btn" id="save">${g?'Save':'Add goal'}</button><button class="btn ghost" id="cancel">Cancel</button></div>
     ${g?'<button class="btn danger" id="del">Delete goal</button>':''}`,s=>{
     s.querySelector('#cancel').onclick=closeSheet;
     s.querySelector('#save').onclick=()=>{
-      const text=s.querySelector('#gtext').value.trim();if(!text){s.querySelector('#gtext').focus();return}
+      const text=g&&g.trickId?goalLabel(g):s.querySelector('#gtext').value.trim();if(!text){s.querySelector('#gtext').focus();return}
       const base=g?(({id:_,...r})=>r)(g):{rider:ui.rider,done:false,created:Date.now()};
       store.put('goals',g?g.id:uid(),{...base,text,due:s.querySelector('#gdue').value||''});
       closeSheet();
@@ -752,6 +769,7 @@ document.addEventListener('click',e=>{
   if(b.id==='fab'){addMenu();return}
 });
 document.getElementById('riders').addEventListener('dblclick',namesSheet);
+document.addEventListener('change',e=>{const c=e.target.closest('input[data-goal]');if(!c||c.closest('#sheetHost'))return;toggleTrickGoal(c.dataset.goal,c.checked)});
 
 function locSheet(id){
   const l=state.locations.find(x=>x.id===id);if(!l)return;
