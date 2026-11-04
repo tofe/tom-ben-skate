@@ -159,7 +159,10 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .ochip .oname{border:0;background:none;padding:0;font:inherit;font-weight:600;color:inherit;display:inline-flex;align-items:center;gap:4px}
 .ochip .plus{color:var(--rider);font-weight:800}
 .ochip small{font-family:var(--label);color:var(--muted)}
-.ochip button{border:0;background:var(--line);color:var(--ink);width:24px;height:24px;border-radius:50%;padding:0;line-height:1;font-size:15px}
+.ochip .orm{border:1px solid var(--miss);background:transparent;color:var(--miss);border-radius:999px;padding:3px 10px;font-size:13px;font-weight:700}
+.ochip.editing{padding-right:5px}
+.linkbtn{border:0;background:none;color:var(--rider);font-weight:700;font-size:15px;padding:2px 4px}
+.confirmbox{display:flex;flex-direction:column;gap:10px;border:1px solid var(--miss);background:var(--surface);border-radius:12px;padding:12px}
 .trick .tm.needs{color:var(--warn);font-weight:600}
 .bcard{display:flex;flex-direction:column;align-items:flex-start;gap:8px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--rider);border-radius:var(--r);padding:14px 16px}
 .bcard .bt{font-family:var(--display);font-size:22px;line-height:1.1;overflow-wrap:anywhere}
@@ -863,7 +866,8 @@ function locSheet(id){
   };
   const body=(ui.rider==='b'?['b','a']:['a','b']).map(part).join('');
   openSheet(`<h2>${esc(l.name)}</h2>
-    <div class="field"><label class="lbl" for="lobsIn">Obstacles here</label><span class="note" id="lobsHint">Tap an obstacle to add tricks on it.</span><div class="lib" id="lobs"></div>
+    <div class="field"><div class="sh"><label class="lbl" for="lobsIn">Obstacles here</label><button class="linkbtn" id="lobsEdit" hidden>Edit</button></div><span class="note" id="lobsHint">Tap an obstacle to add tricks on it.</span><div class="lib" id="lobs"></div>
+      <div class="confirmbox" id="lobsConfirm" hidden></div>
       <div class="row"><input id="lobsIn" list="obsList" placeholder="e.g. Hubba, flat bar, 5 stair rail" autocomplete="off" style="flex:1"><button class="btn" id="lobsAdd" style="flex:none">Add</button></div>
       <datalist id="obsList">${OBSTACLES.map(o=>`<option value="${esc(o)}"></option>`).join('')}</datalist></div>
     <p class="note" style="margin:0">${tricks.length} trick${tricks.length===1?'':'s'} and ${runs.length} run${runs.length===1?'':'s'} at this spot. Tap one to open it.</p>
@@ -872,12 +876,28 @@ function locSheet(id){
     s.querySelector('#lclose').onclick=closeSheet;
     let obs=[...obstaclesOf(id)];
     const saveObs=()=>{const cur=state.locations.find(x=>x.id===id)||l;const {id:_,...rest}=cur;store.put('locations',id,{...rest,obstacles:obs})};
-    const drawObs=()=>{s.querySelector('#lobs').innerHTML=obs.length?obs.map((o,i)=>{const n=state.tricks.filter(t=>t.locId===id&&t.obstacle===o).length;return `<span class="ochip"><button class="oname" data-oadd="${i}" aria-label="Add tricks on ${esc(o)}">${esc(o)}${n?` <small>${n}</small>`:''} <span class="plus">+</span></button><button data-orm="${i}" aria-label="Remove ${esc(o)}">×</button></span>`}).join(''):'<span class="note">No obstacles yet. Add the rails, ledges and ramps at this spot so you can pick them on tricks.</span>';const h=s.querySelector('#lobsHint');if(h)h.hidden=!obs.length};
+    let editObs=false,confirmObs=-1;
+    const drawObs=()=>{
+      const box=s.querySelector('#lobs');
+      box.innerHTML=obs.length?obs.map((o,i)=>{const n=state.tricks.filter(t=>t.locId===id&&t.obstacle===o).length;
+        return editObs?`<span class="ochip editing">${esc(o)}${n?` <small>${n}</small>`:''}<button class="orm" data-orm="${i}" aria-label="Remove ${esc(o)}">Remove</button></span>`
+          :`<span class="ochip"><button class="oname" data-oadd="${i}" aria-label="Add tricks on ${esc(o)}">${esc(o)}${n?` <small>${n}</small>`:''} <span class="plus">+</span></button></span>`}).join(''):'<span class="note">No obstacles yet. Add the rails, ledges and ramps at this spot so you can pick them on tricks.</span>';
+      const o=obs[confirmObs],c=s.querySelector('#lobsConfirm');
+      if(editObs&&o!==undefined){const n=state.tricks.filter(t=>t.locId===id&&t.obstacle===o).length;
+        c.innerHTML=`<p style="margin:0"><b>Remove ${esc(o)} from ${esc(l.name)}?</b>${n?` ${n} trick${n===1?' is':'s are'} set on it and will need a new obstacle.`:''}</p><div class="row"><button class="btn danger" id="lobsYes">Remove ${esc(o)}</button><button class="btn ghost" id="lobsNo">Keep it</button></div>`;c.hidden=false}
+      else{c.hidden=true;c.innerHTML=''}
+      const h=s.querySelector('#lobsHint');if(h){h.hidden=!obs.length;h.textContent=editObs?'Tap Remove on an obstacle you want to take away.':'Tap an obstacle to add tricks on it.'}
+      const eb=s.querySelector('#lobsEdit');if(eb){eb.hidden=!obs.length;eb.textContent=editObs?'Done':'Edit'}
+    };
     drawObs();
     const addObs=()=>{const inp=s.querySelector('#lobsIn');const v=inp.value.trim();if(!v)return;if(obs.some(o=>o.toLowerCase()===v.toLowerCase())){toast(`${v} is already here`);return}obs.push(v);inp.value='';drawObs();saveObs()};
     s.querySelector('#lobsAdd').onclick=addObs;
     s.querySelector('#lobsIn').addEventListener('keydown',e=>{if(e.key==='Enter')addObs()});
-    s.querySelector('#lobs').addEventListener('click',e=>{const a=e.target.closest('[data-oadd]');if(a){const o=obs[+a.dataset.oadd];if(o)trickSheet({locId:id,obstacle:o,back:()=>locSheet(id)});return}const b=e.target.closest('[data-orm]');if(!b)return;obs.splice(+b.dataset.orm,1);drawObs();saveObs()});
+    s.querySelector('#lobs').addEventListener('click',e=>{const a=e.target.closest('[data-oadd]');if(a){const o=obs[+a.dataset.oadd];if(o)trickSheet({locId:id,obstacle:o,back:()=>locSheet(id)});return}const b=e.target.closest('[data-orm]');if(!b)return;confirmObs=+b.dataset.orm;drawObs();s.querySelector('#lobsConfirm').scrollIntoView({block:'nearest'})});
+    s.querySelector('#lobsEdit').onclick=()=>{editObs=!editObs;confirmObs=-1;drawObs()};
+    s.querySelector('#lobsConfirm').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+      if(b.id==='lobsYes'){const o=obs[confirmObs];if(o!==undefined){obs.splice(confirmObs,1);saveObs();toast(`Removed ${o}`)}}
+      confirmObs=-1;drawObs()});
     s.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.edit)editTrick(b.dataset.edit);else if(b.dataset.run)runSheet(b.dataset.run)});
   });
 }
