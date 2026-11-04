@@ -175,6 +175,7 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .lib{display:flex;flex-wrap:wrap;gap:6px}
 .lib button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:7px 11px;font-size:14px;font-weight:600}
 .lib button.have{opacity:.4;text-decoration:line-through}
+.lib button.custom{border-style:dashed;border-color:var(--muted)}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 .row .btn{flex:1}
 .note{font-size:14px;color:var(--muted)}
@@ -476,7 +477,14 @@ function trickSheet(){
   const draw=s=>{
     s.querySelector('#cats').innerHTML=CAT_NAMES.map(c=>`<button class="chip" data-c="${esc(c)}" aria-pressed="${c===cat}">${esc(c)}</button>`).join('');
     s.querySelectorAll('#stc button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.s===stance));
-    s.querySelector('#lib').innerHTML=CATS[cat].map(sn).map(n=>`<button data-n="${esc(n)}" class="${have.has(key(n,cat))?'have':''}">${esc(n)}</button>`).join('');
+    // built-in tricks for this section, plus any trick name either skater has typed in for it
+    const base=CATS[cat]||[];
+    const baseSet=new Set(base.flatMap(n=>STANCES.map(st=>(st==='Regular'?n:st+' '+n.charAt(0).toLowerCase()+n.slice(1)).toLowerCase())));
+    const hasStance=n=>STANCES.slice(1).some(st=>n.toLowerCase().startsWith(st.toLowerCase()+' '));
+    const customs=[...new Map(state.tricks.filter(t=>t.cat===cat&&!baseSet.has(fullName(t).toLowerCase())).map(t=>[fullName(t).toLowerCase(),fullName(t)])).values()].sort((a,b)=>a.localeCompare(b));
+    const customShown=customs.filter(n=>stance==='Regular'||!hasStance(n)).map(n=>stance==='Regular'?n:sn(n));
+    const btn=(n,extra)=>`<button data-n="${esc(n)}" class="${have.has(key(n,cat))?'have':''} ${extra||''}">${esc(n)}</button>`;
+    s.querySelector('#lib').innerHTML=base.map(sn).map(n=>btn(n)).join('')+customShown.filter(n=>!base.map(sn).some(b=>b.toLowerCase()===n.toLowerCase())).map(n=>btn(n,'custom')).join('');
   };
   openSheet(`<h2>Add tricks</h2>
     <p class="note" style="margin:0">Tap to add to the wishlist. You can move them along as they progress.</p>
