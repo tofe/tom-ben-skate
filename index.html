@@ -268,41 +268,42 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
   <div class="strip" id="strip"></div>
   <div class="ladder" id="ladder" aria-hidden="true"></div>
 
-  <section>
+  <section class="hsec" data-sec="goals">
     <div class="sh"><h2>Goals</h2><span class="lbl" id="goalCount"></span></div>
     <div id="goals" class="group"></div>
   </section>
 
-  <section>
+  <section class="hsec" data-sec="locations">
     <div class="sh"><h2>Locations</h2><span class="lbl" id="locCount"></span></div>
     <div class="field"><label class="lbl" for="newLoc">Add a skatepark or spot</label>
       <div class="row"><input id="newLoc" placeholder="e.g. Local skatepark, school stairs" autocomplete="off" style="flex:1"><button class="btn" id="addLoc" style="flex:none">Add</button></div></div>
     <div id="locs" class="group"></div>
   </section>
 
-  <section>
+  <section class="hsec" data-sec="tricks">
     <div class="sh" style="align-items:center"><h2>Tricks</h2><span class="lbl" id="trickCount"></span></div>
     <div class="filters" id="locfilters" aria-label="Filter by location"></div>
     <div class="filters" id="filters"></div>
     <div id="tricks"></div>
   </section>
 
-  <section>
+  <section class="hsec" data-sec="runs">
     <div class="sh"><h2>Runs</h2><span class="lbl" id="runCount"></span></div>
     <div id="runs" class="group"></div>
   </section>
 
 
-  <section>
+  <section class="hsec" data-sec="decks">
     <div class="sh"><h2>Decks</h2><span class="lbl" id="boardCount"></span></div>
     <div id="boards" class="group"></div>
   </section>
 
-  <section>
+  <section class="hsec" data-sec="shoes">
     <div class="sh"><h2>Shoes</h2><span class="lbl" id="shoeCount"></span></div>
     <div id="shoes" class="group"></div>
   </section>
 
+  <button class="btn ghost" data-act="arrange" style="width:100%">Arrange home page</button>
   <p class="note" id="footnote"></p>
 </div>
 
@@ -343,6 +344,24 @@ const fullName=t=>t.stance&&t.stance!=='Regular'&&!t.name.toLowerCase().startsWi
 
 let state={riders:{a:{name:'Skater 1'},b:{name:'Skater 2'}},tricks:[],goals:[],locations:[],runs:[],boards:[],shoes:[],runDefs:[]};
 let sheetOnClose=null;
+const SECTIONS=[['goals','Goals'],['locations','Locations'],['tricks','Tricks'],['runs','Runs'],['decks','Decks'],['shoes','Shoes']];
+let layout=null;try{const l=JSON.parse(localStorage.getItem('skate-layout')||'null');if(Array.isArray(l))layout=l}catch(e){}
+function sectionOrder(){const known=SECTIONS.map(x=>x[0]);const o=(layout||[]).filter(k=>known.includes(k));known.forEach(k=>{if(!o.includes(k))o.push(k)});return o}
+function applyLayout(){const app=document.getElementById('app'),anchor=app.querySelector('[data-act="arrange"]');sectionOrder().forEach(k=>{const el=app.querySelector(`section[data-sec="${k}"]`);if(el)app.insertBefore(el,anchor)})}
+function setLayout(o,save){layout=o;try{localStorage.setItem('skate-layout',JSON.stringify(o))}catch(e){}applyLayout();if(save&&store.db)store.db.doc('app/layout').set({order:o}).catch(saveErr)}
+function arrangeSheet(){
+  let o=sectionOrder();const label=k=>SECTIONS.find(x=>x[0]===k)[1];
+  openSheet(`<h2>Arrange home page</h2><p class="note" style="margin:0">Move sections up or down. This order is used on every device.</p><div id="arr" class="group"></div>
+    <div class="row"><button class="btn" id="asave">Save</button><button class="btn ghost" id="acancel">Cancel</button></div>
+    <button class="btn ghost" id="areset">Reset to the original order</button>`,s=>{
+    const draw=()=>{s.querySelector('#arr').innerHTML=o.map((k,i)=>`<div class="ri"><span class="num">${i+1}</span><span class="n">${esc(label(k))}</span><span class="mv"><button data-mv="${i}" data-d="-1" aria-label="Move ${esc(label(k))} up" ${i===0?'disabled':''}>▲</button><button data-mv="${i}" data-d="1" aria-label="Move ${esc(label(k))} down" ${i===o.length-1?'disabled':''}>▼</button></span></div>`).join('')};
+    draw();
+    s.querySelector('#arr').onclick=e=>{const b=e.target.closest('[data-mv]');if(!b)return;const i=+b.dataset.mv,j=i+(+b.dataset.d);if(j<0||j>=o.length)return;[o[i],o[j]]=[o[j],o[i]];draw();const nb=s.querySelector(`[data-mv="${j}"][data-d="${b.dataset.d}"]`);nb&&!nb.disabled&&nb.focus()};
+    s.querySelector('#areset').onclick=()=>{o=SECTIONS.map(x=>x[0]);draw()};
+    s.querySelector('#acancel').onclick=closeSheet;
+    s.querySelector('#asave').onclick=()=>{setLayout(o,true);closeSheet();toast('Home page arranged')};
+  });
+}
 let pendingLocDel=null;
 let ui={rider:'a',filter:'all',loc:'all'};
 try{const s=JSON.parse(localStorage.getItem('skate-ui')||'{}');if(s.rider)ui.rider=s.rider;if(s.loc)ui.loc=s.loc;}catch(e){}
@@ -440,6 +459,7 @@ function startSync(){
   subs.push(db.collection('locations').onSnapshot(s=>{state.locations=rows(s);render()},fail));
   subs.push(db.collection('runs').onSnapshot(M,s=>{state.runs=rows(s);if(!s.metadata.fromCache){runsReady=true;migrateRuns()}render()},fail));
   subs.push(db.collection('runDefs').onSnapshot(M,s=>{state.runDefs=rows(s);if(!s.metadata.fromCache){defsReady=true;migrateRuns()}render()},fail));
+  subs.push(db.doc('app/layout').onSnapshot(s=>{if(s.exists&&Array.isArray(s.data().order))setLayout(s.data().order,false)},()=>{}));
   subs.push(db.collection('boards').onSnapshot(s=>{state.boards=rows(s);render()},fail));
   subs.push(db.collection('shoes').onSnapshot(s=>{state.shoes=rows(s);render()},fail));
 }
@@ -851,6 +871,7 @@ document.addEventListener('click',e=>{
   if(b.id==='addLoc'){addLoc();return}
   if(b.dataset.ldel){delLoc(b.dataset.ldel);return}
   if(b.dataset.lhide){const l=state.locations.find(x=>x.id===b.dataset.lhide);if(l){const {id,...r}=l;const h=!l.hidden;store.put('locations',id,{...r,hidden:h});toast(h?`${l.name} hidden. Find it under Show hidden spots.`:`${l.name} is back on the home page`)}return}
+  if(b.dataset.act==='arrange'){arrangeSheet();return}
   if(b.dataset.act==='toggle-hidden'){ui.showHidden=!ui.showHidden;render();return}
   if(b.dataset.loc){locSheet(b.dataset.loc);return}
   if(b.id==='fab'){addMenu();return}
@@ -1182,6 +1203,7 @@ function runSheet(id,initial,back){
   sheetOnClose=()=>{if(timer)flush()};
 }
 
+applyLayout();
 boot();
 </script>
 </body>
