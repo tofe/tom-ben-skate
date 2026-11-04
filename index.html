@@ -209,6 +209,11 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
   <div class="ladder" id="ladder" aria-hidden="true"></div>
 
   <section>
+    <div class="sh"><h2>Goals</h2><span class="lbl" id="goalCount"></span></div>
+    <div id="goals" class="group"></div>
+  </section>
+
+  <section>
     <div class="sh" style="align-items:center"><h2>Tricks</h2><span class="lbl" id="trickCount"></span></div>
     <div class="filters" id="filters"></div>
     <div id="tricks"></div>
@@ -219,10 +224,6 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
     <div id="runs" class="group"></div>
   </section>
 
-  <section>
-    <div class="sh"><h2>Goals</h2><span class="lbl" id="goalCount"></span></div>
-    <div id="goals" class="group"></div>
-  </section>
 
   <section>
     <div class="sh"><h2>Locations</h2><span class="lbl" id="locCount"></span></div>
@@ -240,21 +241,7 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script>
-/* ============================================================
-   FIREBASE SETTINGS: replace this whole block with the
-   firebaseConfig from your Firebase project (see README.md)
-   ============================================================ */
-const firebaseConfig = {
-  apiKey: "AIzaSyDh4DQvLKcT7SmSBlWgpPY4BHy7wJxAKDw",
-  authDomain: "skate-log-1359a.firebaseapp.com",
-  projectId: "skate-log-1359a",
-  storageBucket: "skate-log-1359a.firebasestorage.app",
-  messagingSenderId: "1019602238814",
-  appId: "1:1019602238814:web:02632968cf4767f3fde3cf"
-};
-/* ============================================================ */
-</script>
+<script src="config.js"></script>
 <script>
 const STATUSES=[
   {k:'wish',label:'Want to learn',short:'Wishlist'},
