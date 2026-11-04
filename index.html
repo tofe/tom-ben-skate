@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tom &amp; Ben Skate!</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tom &amp; Ben Skate!">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: one-column phone app. Rider switch on top, progress strip, trick ladder by status, goals, floating add button + bottom sheet. */
+:root{
+  --bg:#e9e7e2;          /* concrete */
+  --surface:#f7f6f3;
+  --line:#d3d0c8;
+  --ink:#1e2124;
+  --muted:#6a6c6e;
+  --a:#2347c9;           /* rider A: cobalt */
+  --a-soft:#dde3fb;
+  --b:#d9472b;           /* rider B: coral red */
+  --b-soft:#fbe0d8;
+  --wax:#f2c230;         /* wax yellow */
+  --landed:#e06a12;      /* orange */
+  --locked:#1f8a4c;      /* green */
+  --miss:#c8322b;
+  --good:#1f8a4c;
+  --warn:#b4600c;
+  --display:"Bowlby One","Arial Black",Impact,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --label:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --r:14px;
+  --rider:var(--a); --rider-soft:var(--a-soft);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#17191b; --surface:#212427; --line:#33373b; --ink:#eceae5; --muted:#9a9c9e;
+  --a:#7d97ff; --a-soft:#232c4d; --b:#ff7a5c; --b-soft:#4a2620; --wax:#f2c230;
+  --landed:#ff8a2e; --locked:#3fbf73;
+  --good:#4cc47e; --warn:#f0a050; --miss:#ff6b5e; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#17191b; --surface:#212427; --line:#33373b; --ink:#eceae5; --muted:#9a9c9e;
+  --a:#7d97ff; --a-soft:#232c4d; --b:#ff7a5c; --b-soft:#4a2620; --wax:#f2c230;
+  --landed:#ff8a2e; --locked:#3fbf73;
+  --good:#4cc47e; --warn:#f0a050; --miss:#ff6b5e; color-scheme:dark;
+}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{margin:0}
+.bgimg{position:fixed;inset:0;z-index:-1;background-size:cover;background-position:center 30%;background-repeat:no-repeat}
+.bgimg::after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,color-mix(in srgb,var(--bg) 35%,transparent) 0,color-mix(in srgb,var(--bg) 70%,transparent) 260px,color-mix(in srgb,var(--bg) 88%,transparent) 520px)}
+body.hasbg h1{text-shadow:0 1px 10px color-mix(in srgb,var(--bg) 90%,transparent)}
+body.hasbg .sync{color:var(--ink);background:color-mix(in srgb,var(--surface) 80%,transparent);padding:3px 8px;border-radius:999px}
+body.hasbg .note#footnote{background:color-mix(in srgb,var(--surface) 85%,transparent);padding:8px 12px;border-radius:10px}
+.login{min-height:75vh;display:grid;place-items:center}
+.login .card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:14px;box-sizing:border-box}
+.login .card h1 span{color:var(--a)}
+#loginForm{display:flex;flex-direction:column;gap:14px}
+.err{color:var(--miss);margin:0;font-weight:600}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.4;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 48px}
+body.rb{--rider:var(--b);--rider-soft:var(--b-soft)}
+.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--wax);outline-offset:2px}
+.lbl{font-family:var(--label);font-weight:600;text-transform:uppercase;letter-spacing:.08em;font-size:13px;color:var(--muted)}
+
+header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(21px,6.4vw,28px);text-wrap:balance;margin:0;letter-spacing:.01em;line-height:1}
+h1 span{color:var(--rider);transition:color .2s}
+.sync{font-family:var(--label);font-size:13px;color:var(--muted);text-align:right}
+
+.riders{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:6px}
+.rider{border:0;background:transparent;border-radius:13px;padding:12px 10px;display:flex;align-items:center;gap:10px;min-width:0;text-align:left}
+.rider .dot{width:34px;height:34px;flex:none;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-size:15px;color:#fff}
+.rider[data-r="a"] .dot{background:var(--a);box-shadow:0 0 0 2px var(--a)} .rider[data-r="b"] .dot{background:var(--b);box-shadow:0 0 0 2px var(--b)}
+.rider .dot{overflow:hidden}
+.rider .dot img,.av img{width:100%;height:100%;object-fit:cover;display:block}
+.who{display:flex;gap:12px;align-items:center}
+.av{width:52px;height:52px;border-radius:50%;flex:none;display:grid;place-items:center;font-family:var(--display);font-size:20px;color:#fff;overflow:hidden}
+.av-a{background:var(--a)} .av-b{background:var(--b)}
+.filebtn{text-align:center;cursor:pointer}
+.rider .nm{font-weight:700;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.rider .ct{font-family:var(--label);font-size:13px;color:var(--muted)}
+.rider[aria-pressed="true"]{background:var(--rider-soft)}
+
+.strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.stat b{display:block;font-family:var(--display);font-weight:400;font-size:30px;line-height:1;font-variant-numeric:tabular-nums}
+.stat:first-child b{color:var(--rider)}
+.ladder{height:10px;border-radius:5px;background:var(--line);overflow:hidden;display:flex}
+.ladder i{display:block;height:100%}
+
+section{display:flex;flex-direction:column;gap:10px}
+.sh{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
+.filters{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-family:var(--label);font-weight:600;font-size:14px;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+.group{display:flex;flex-direction:column;gap:6px}
+.group h3{margin:6px 0 0;display:flex;align-items:center;gap:8px}
+.tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--label);font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.06em;padding:3px 9px;border-radius:6px}
+.s-wish{background:var(--line);color:var(--ink)}
+.s-working{background:var(--wax);color:#2a2100}
+.s-landed{background:var(--landed);color:#fff}
+.s-locked{background:var(--locked);color:#fff}
+.trick{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;text-align:left;width:100%}
+.trick .t{flex:1;min-width:0}
+.trick .tn{font-weight:700;font-size:17px;overflow-wrap:anywhere}
+.trick .tm{font-size:14px;color:var(--muted);overflow-wrap:anywhere}
+.trick .go{flex:none;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 10px;font-family:var(--label);font-weight:700;font-size:14px;white-space:nowrap}
+.pips{display:flex;gap:3px;flex:none}
+.pips i{width:7px;height:18px;border-radius:2px;background:var(--line)}
+.pips i.on{background:var(--rider)}
+.pips[data-s="landed"] i.on{background:var(--landed)}
+.pips[data-s="locked"] i.on{background:var(--locked)}
+.empty{border:2px dashed var(--line);border-radius:var(--r);padding:18px;color:var(--muted);text-align:center}
+.empty button{margin-top:10px}
+
+.goal{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.goal .chk{flex:none;width:28px;height:28px;border-radius:8px;border:2px solid var(--rider);background:transparent;display:grid;place-items:center;color:#fff;padding:0}
+.goal.done .chk{background:var(--rider)}
+.goal .t{flex:1;min-width:0}
+.goal .gt{font-weight:600;font-size:16px;overflow-wrap:anywhere}
+.goal.done .gt{text-decoration:line-through;color:var(--muted)}
+.goal .gm{font-family:var(--label);font-size:14px;color:var(--muted)}
+.goal .gm .late{color:var(--warn);font-weight:700}
+.goal .x,.loc .x{border:0;background:transparent;color:var(--muted);font-size:14px;padding:4px}
+.loc{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.loc .ln{flex:1;min-width:0;font-weight:700;font-size:16px;overflow-wrap:anywhere}
+.loc .x.armed{color:var(--b);font-weight:700}
+
+.runrow{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;text-align:left;width:100%}
+.runrow .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.runrow .tn{font-weight:700;font-size:17px;overflow-wrap:anywhere}
+.runrow .tm{font-size:14px;color:var(--muted)}
+.runrow .score{flex:none;font-family:var(--label);font-size:16px;color:var(--muted);font-variant-numeric:tabular-nums}
+.runrow .score b{font-family:var(--display);font-weight:400;font-size:26px;color:var(--ink)}
+.marks{display:flex;flex-wrap:wrap;gap:3px}
+.marks i{width:12px;height:12px;border-radius:3px;background:var(--line)}
+.marks i.land{background:var(--locked)} .marks i.miss{background:var(--miss)}
+.ri{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.ri .num{font-family:var(--label);font-weight:700;color:var(--muted);width:18px;text-align:center;flex:none;font-variant-numeric:tabular-nums}
+.ri .n{flex:1;min-width:0;font-weight:700;overflow-wrap:anywhere}
+.mk{flex:none;width:44px;height:44px;border-radius:10px;border:2px solid var(--line);background:var(--surface);font-size:20px;font-weight:700;display:grid;place-items:center;padding:0}
+.mk.ok{color:var(--locked)} .mk.no{color:var(--miss)}
+.mk.ok[aria-pressed="true"]{background:var(--locked);border-color:var(--locked);color:#fff}
+.mk.no[aria-pressed="true"]{background:var(--miss);border-color:var(--miss);color:#fff}
+.ri .rm{flex:none;border:0;background:none;color:var(--muted);font-size:13px;padding:4px 2px}
+.btn{border:0;border-radius:12px;padding:12px 16px;font-weight:700;background:var(--rider);color:#fff}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.danger{background:transparent;color:var(--b);border:1px solid var(--b)}
+.addbtn{border:0;border-radius:999px;padding:9px 16px;background:var(--rider);color:#fff;font-family:var(--display);font-size:15px;white-space:nowrap}
+
+.scrim{position:fixed;inset:0;background:rgba(10,12,14,.45);z-index:30;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:560px;border-radius:22px 22px 0 0;max-height:88%;overflow-y:auto;
+  padding:18px max(18px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 22px) max(18px,env(safe-area-inset-left,0px));
+  display:flex;flex-direction:column;gap:14px;animation:up .22s ease-out}
+@keyframes up{from{transform:translateY(30px);opacity:.6}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.sheet h2{font-size:22px}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.seg4{grid-template-columns:repeat(4,1fr)}
+.seg button{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px 4px;font-family:var(--label);font-weight:700;font-size:14px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.field{display:flex;flex-direction:column;gap:6px}
+.field input,.field select,.field textarea{font:inherit;font-size:16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:11px 12px;width:100%;box-sizing:border-box}
+.field textarea{min-height:70px;resize:vertical}
+.lib{display:flex;flex-wrap:wrap;gap:6px}
+.lib button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:7px 11px;font-size:14px;font-weight:600}
+.lib button.have{opacity:.4;text-decoration:line-through}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row .btn{flex:1}
+.note{font-size:14px;color:var(--muted)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 24px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;z-index:40;font-size:15px}
+</style>
+</head>
+<body>
+<div class="bgimg" id="bgimg" hidden aria-hidden="true"></div>
+
+<div id="login" class="login" hidden>
+  <div class="card">
+    <h1>Tom &amp; Ben <span>Skate!</span></h1>
+    <p class="note" id="loginNote" style="margin:0">Sign in with your family login.</p>
+    <form id="loginForm">
+      <div class="field"><label class="lbl" for="lemail">Email</label><input id="lemail" type="email" autocomplete="username" required></div>
+      <div class="field"><label class="lbl" for="lpass">Password</label><input id="lpass" type="password" autocomplete="current-password" required></div>
+      <p class="err" id="lerr" hidden></p>
+      <button class="btn" type="submit" id="lbtn" style="width:100%">Sign in</button>
+    </form>
+  </div>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <header>
+    <h1>Tom &amp; Ben <span>Skate!</span></h1>
+    <div class="sync" id="sync">Loading…</div>
+  </header>
+
+  <div class="riders" id="riders" role="group" aria-label="Choose skater"></div>
+
+  <div class="strip" id="strip"></div>
+  <div class="ladder" id="ladder" aria-hidden="true"></div>
+
+  <section>
+    <div class="sh" style="align-items:center"><h2>Tricks</h2><span class="lbl" id="trickCount"></span></div>
+    <div class="filters" id="filters"></div>
+    <div id="tricks"></div>
+  </section>
+
+  <section>
+    <div class="sh"><h2>Runs</h2><span class="lbl" id="runCount"></span></div>
+    <div id="runs" class="group"></div>
+  </section>
+
+  <section>
+    <div class="sh"><h2>Goals</h2><span class="lbl" id="goalCount"></span></div>
+    <div id="goals" class="group"></div>
+  </section>
+
+  <section>
+    <div class="sh"><h2>Locations</h2><span class="lbl" id="locCount"></span></div>
+    <div class="field"><label class="lbl" for="newLoc">Add a skatepark or spot</label>
+      <div class="row"><input id="newLoc" placeholder="e.g. Local skatepark, school stairs" autocomplete="off" style="flex:1"><button class="btn" id="addLoc" style="flex:none">Add</button></div></div>
+    <div id="locs" class="group"></div>
+  </section>
+
+  <p class="note" id="footnote"></p>
+</div>
+
+<div id="sheetHost"></div>
+<div id="toastHost"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ============================================================
+   FIREBASE SETTINGS: replace this whole block with the
+   firebaseConfig from your Firebase project (see README.md)
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyDh4DQvLKcT7SmSBlWgpPY4BHy7wJxAKDw",
+  authDomain: "skate-log-1359a.firebaseapp.com",
+  projectId: "skate-log-1359a",
+  storageBucket: "skate-log-1359a.firebasestorage.app",
+  messagingSenderId: "1019602238814",
+  appId: "1:1019602238814:web:02632968cf4767f3fde3cf"
+};
+/* ============================================================ */
+</script>
+<script>
+const STATUSES=[
+  {k:'wish',label:'Want to learn',short:'Wishlist'},
+  {k:'working',label:'Working on it',short:'Working'},
+  {k:'landed',label:'Landed it',short:'Landed'},
+  {k:'locked',label:'Locked in',short:'Locked in'}
+];
+const SIDX=Object.fromEntries(STATUSES.map((s,i)=>[s.k,i]));
+const STANCES=['Regular','Fakie','Switch','Nollie'];
+const CATS={
+  'Flatground':['Ollie','Nollie','Shove-it','Pop shove-it','Frontside 180','Backside 180','Kickflip','Heelflip','Varial flip','Hardflip','360 flip','Manual','Nose manual','Boneless','No comply'],
+  'Ramp & Bowl':['Drop in','Pump','Kickturn','Rock to fakie','Rock n roll','Axle stall','Tail stall','Nose stall','50-50 on coping','Frontside grind','Backside air','Frontside air','Disaster','Blunt to fakie'],
+  'Rails & Ledges':['50-50','5-0','Nosegrind','Crooked grind','Boardslide','Lipslide','Smith','Feeble','Tailslide','Noseslide'],
+};
+const GAP_TRICKS=['Ollie','Pop shove-it','Frontside 180','Backside 180','Kickflip','Heelflip','Varial flip','Frontside flip','Backside flip','360 flip','Hardflip'];
+const STAIR_TRICKS=[...GAP_TRICKS,'50-50 handrail','Boardslide handrail','Lipslide handrail','Feeble handrail','5-0 handrail'];
+CATS['Death Gap']=GAP_TRICKS;
+['2 Stair','3 Stair','5 Stair','6 Stair','7 Stair','Street Stairs'].forEach(k=>CATS[k]=STAIR_TRICKS);
+const CAT_NAMES=Object.keys(CATS);
+const fullName=t=>t.stance&&t.stance!=='Regular'&&!t.name.toLowerCase().startsWith(t.stance.toLowerCase())?t.stance+' '+t.name.charAt(0).toLowerCase()+t.name.slice(1):t.name;
+
+let state={riders:{a:{name:'Skater 1'},b:{name:'Skater 2'}},tricks:[],goals:[],locations:[],runs:[]};
+let sheetOnClose=null;
+let pendingLocDel=null;
+let ui={rider:'a',filter:'all'};
+try{const s=JSON.parse(localStorage.getItem('skate-ui')||'{}');if(s.rider)ui.rider=s.rider;}catch(e){}
+const saveUI=()=>{try{localStorage.setItem('skate-ui',JSON.stringify({rider:ui.rider}))}catch(e){}};
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const fmtDate=iso=>{if(!iso)return'';const d=new Date(iso+(iso.length===10?'T12:00:00':''));return d.toLocaleDateString(undefined,{day:'numeric',month:'short'})};
+const daysTo=iso=>{const a=new Date(today()+'T12:00:00'),b=new Date(iso+'T12:00:00');return Math.round((b-a)/864e5)};
+
+function toast(msg){const h=$('#toastHost');h.innerHTML=`<div class="toast" role="status">${esc(msg)}</div>`;clearTimeout(toast.t);toast.t=setTimeout(()=>h.innerHTML='',2200)}
+
+/* ---------- storage: shared db when available, otherwise this device only ---------- */
+const store={mode:'local',db:null,
+  async put(coll,id,data){
+    if(this.db){this.db.doc(coll+'/'+id).set(data).catch(saveErr);return}
+    else{const list=state[coll];const i=list.findIndex(x=>x.id===id);const row={...data,id};i>=0?list[i]=row:list.push(row);this.persist();render();}
+  },
+  async del(coll,id){
+    if(this.db){this.db.doc(coll+'/'+id).delete().catch(saveErr);return}
+    else{state[coll]=state[coll].filter(x=>x.id!==id);this.persist();render();}
+  },
+  async putRiders(r){
+    if(this.db){this.db.doc('app/riders').set(r).catch(saveErr);return}
+    else{state.riders=r;this.persist();render();}
+  },
+  persist(){try{localStorage.setItem('skate-data',JSON.stringify({riders:state.riders,tricks:state.tricks,goals:state.goals,locations:state.locations,runs:state.runs}))}catch(e){}},
+  loadLocal(){try{const d=JSON.parse(localStorage.getItem('skate-data')||'null');if(d){state.riders=d.riders||state.riders;state.tricks=d.tricks||[];state.goals=d.goals||[];state.locations=d.locations||[];state.runs=d.runs||[];}}catch(e){}}
+};
+
+function saveErr(e){toast(e&&e.code==='permission-denied'?'This login isn’t allowed to save changes.':'Could not save. Check your connection.')}
+function showApp(on){$('#app').hidden=!on;$('#login').hidden=on}
+
+function boot(){
+  render();
+  if(window.PREVIEW_DATA){const d=window.PREVIEW_DATA;state.riders=d.riders||state.riders;['tricks','goals','locations','runs'].forEach(k=>state[k]=d[k]||[]);state.bg=d.background||'';applyBg();showApp(true);$('#sync').textContent='Preview · not saved';render();return}
+  if(!window.firebase||String(firebaseConfig.apiKey).startsWith('PASTE')){
+    showApp(false);
+    $('#loginNote').textContent='Almost there. Paste your Firebase settings into index.html, as described in README.md.';
+    $('#loginForm').hidden=true;return;
+  }
+  firebase.initializeApp(firebaseConfig);
+  const db=firebase.firestore();
+  db.settings({ignoreUndefinedProperties:true});
+  db.enablePersistence({synchronizeTabs:true}).catch(()=>{}); // keeps working offline at the park
+  store.db=db;store.mode='db';
+  firebase.auth().onAuthStateChanged(u=>{if(u){showApp(true);startSync()}else{stopSync();showApp(false)}});
+  $('#loginForm').addEventListener('submit',async e=>{
+    e.preventDefault();const err=$('#lerr'),btn=$('#lbtn');err.hidden=true;btn.disabled=true;btn.textContent='Signing in…';
+    try{await firebase.auth().signInWithEmailAndPassword($('#lemail').value.trim(),$('#lpass').value);$('#lpass').value=''}
+    catch(x){err.textContent=x.code==='auth/network-request-failed'?'No connection. Check your internet and try again.':x.code==='auth/too-many-requests'?'Too many tries. Wait a minute and try again.':'That email and password didn’t match. Try again.';err.hidden=false}
+    btn.disabled=false;btn.textContent='Sign in';
+  });
+}
+
+let subs=[];
+function stopSync(){subs.forEach(f=>f());subs=[];state.tricks=[];state.goals=[];state.locations=[];state.runs=[];state.bg='';applyBg();render()}
+function applyBg(){const el=$('#bgimg');el.style.backgroundImage=state.bg?`url("${state.bg}")`:'';el.hidden=!state.bg;document.body.classList.toggle('hasbg',!!state.bg)}
+function shrinkBg(file){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file);const img=new Image();
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('bad'))};
+    img.onload=()=>{const M=1100,k=Math.min(1,M/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement('canvas');
+      c.width=Math.round(img.naturalWidth*k);c.height=Math.round(img.naturalHeight*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',0.74))};
+    img.src=url;
+  });
+}
+function startSync(){
+  stopSync();const db=store.db,M={includeMetadataChanges:true};
+  $('#sync').textContent='Loading…';
+  let firstT=false,firstG=false;
+  const timer=setTimeout(()=>{$('#sync').textContent='Offline · will sync later'},10000);
+  const done=()=>{if(firstT&&firstG){clearTimeout(timer);$('#sync').textContent='Synced'}};
+  const fail=e=>{clearTimeout(timer);$('#sync').textContent=e&&e.code==='permission-denied'?'This login has no access':'Sync stopped. Reload to retry'};
+  const rows=s=>s.docs.map(d=>({...d.data(),id:d.id}));
+  subs.push(db.doc('app/riders').onSnapshot(M,s=>{if(s.exists){const d=s.data();state.riders={a:{name:d.a?.name||'Skater 1',photo:d.a?.photo||''},b:{name:d.b?.name||'Skater 2',photo:d.b?.photo||''}};render()}},fail));
+  subs.push(db.collection('tricks').onSnapshot(M,s=>{state.tricks=rows(s);if(!s.metadata.fromCache)firstT=true;done();render()},fail));
+  subs.push(db.collection('goals').onSnapshot(M,s=>{state.goals=rows(s);if(!s.metadata.fromCache)firstG=true;done();render()},fail));
+  subs.push(db.doc('app/background').onSnapshot(s=>{state.bg=s.exists?(s.data().photo||''):'';applyBg()},fail));
+  subs.push(db.collection('locations').onSnapshot(s=>{state.locations=rows(s);render()},fail));
+  subs.push(db.collection('runs').onSnapshot(s=>{state.runs=rows(s);render()},fail));
+}
+
+function exportData(){
+  const out={app:'skate-log',version:1,exported:new Date().toISOString(),riders:state.riders,background:state.bg||'',tricks:state.tricks,goals:state.goals,locations:state.locations,runs:state.runs};
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,1)],{type:'application/json'}));
+  a.download=`skate-log-backup-${today()}.json`;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
+}
+async function importData(file){
+  let d;try{d=JSON.parse(await file.text())}catch(e){d=null}
+  if(!d||!Array.isArray(d.tricks)){toast('That file isn’t a Tom & Ben Skate! backup.');return}
+  const ops=[];
+  if(d.riders)ops.push(['app','riders',d.riders]);
+  if(d.background)ops.push(['app','background',{photo:d.background}]);
+  ['tricks','goals','locations','runs'].forEach(c=>(d[c]||[]).forEach(({id,...rest})=>{if(id)ops.push([c,id,rest])}));
+  toast(`Importing ${ops.length} items…`);
+  try{
+    for(let i=0;i<ops.length;i+=400){const b=store.db.batch();ops.slice(i,i+400).forEach(([c,id,data])=>b.set(store.db.doc(c+'/'+id),data));await b.commit()}
+    toast(`Imported ${ops.length} items`);
+  }catch(e){saveErr(e)}
+}
+
+/* ---------- render ---------- */
+function render(){
+  document.body.classList.toggle('rb',ui.rider==='b');
+  const R=ui.rider;
+  const mine=state.tricks.filter(t=>t.rider===R);
+  const goals=state.goals.filter(g=>g.rider===R);
+
+  $('#riders').innerHTML=['a','b'].map(k=>{
+    const n=state.riders[k]?.name||'Skater';
+    const landed=state.tricks.filter(t=>t.rider===k&&SIDX[t.status]>=2).length;
+    return `<button class="rider" data-r="${k}" aria-pressed="${k===R}"><span class="dot">${state.riders[k]?.photo?`<img src="${esc(state.riders[k].photo)}" alt="">`:esc((n.trim()[0]||'?').toUpperCase())}</span><span style="min-width:0;display:flex;flex-direction:column"><span class="nm">${esc(n)}</span><span class="ct">${landed} landed</span></span></button>`
+  }).join('');
+
+  const c=k=>mine.filter(t=>t.status===k).length;
+  const gDone=goals.filter(g=>g.done).length;
+  $('#strip').innerHTML=`
+    <div class="stat"><span class="lbl">Landed</span><b>${c('landed')+c('locked')}</b></div>
+    <div class="stat"><span class="lbl">Working on</span><b>${c('working')}</b></div>
+    <div class="stat"><span class="lbl">Goals hit</span><b>${gDone}<small style="font-family:var(--label);font-size:16px;color:var(--muted)">/${goals.length}</small></b></div>`;
+  const tot=mine.length||1;
+  const col={wish:'var(--line)',working:'var(--wax)',landed:'var(--landed)',locked:'var(--locked)'};
+  $('#ladder').innerHTML=mine.length?['locked','landed','working','wish'].map(k=>`<i style="width:${c(k)/tot*100}%;background:${col[k]}"></i>`).join(''):'';
+  $('#ladder').hidden=!mine.length;
+
+  $('#filters').innerHTML=[['all','All'],...CAT_NAMES.map(n=>[n,n])].map(([k,l])=>`<button class="chip" data-f="${esc(k)}" aria-pressed="${ui.filter===k}">${esc(l)}</button>`).join('');
+  const shown=mine.filter(t=>ui.filter==='all'||t.cat===ui.filter);
+  $('#trickCount').textContent=mine.length?`${mine.length} on the list`:'';
+
+  const name=esc(state.riders[R]?.name||'this skater');
+  if(!mine.length){
+    $('#tricks').innerHTML=`<div class="empty">No tricks yet for ${name}.<br>Pick from the trick list or add your own.<br><button class="btn" data-act="add-trick">Add tricks</button></div>`;
+  }else if(!shown.length){
+    $('#tricks').innerHTML=`<div class="empty">Nothing in ${esc(ui.filter)} yet.<br><button class="btn" data-act="add-trick">Add tricks</button></div>`;
+  }else{
+    const order=['working','landed','locked','wish'];
+    $('#tricks').innerHTML=order.map(k=>{
+      const list=shown.filter(t=>t.status===k).sort((a,b)=>(b.updated||0)-(a.updated||0));
+      if(!list.length)return'';
+      const S=STATUSES[SIDX[k]];
+      return `<div class="group"><h3><span class="tag s-${k}">${S.label}</span><span class="lbl">${list.length}</span></h3>${list.map(trickRow).join('')}</div>`
+    }).join('')+`<button class="btn ghost" data-act="add-trick" style="width:100%;margin-top:10px">+ Add more tricks</button>`;
+  }
+
+  const runs=state.runs.filter(r=>r.rider===R).sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+  $('#runCount').textContent=runs.length?`${runs.length} run${runs.length===1?'':'s'}`:'';
+  $('#runs').innerHTML=runs.length?runs.map(runRow).join('')+`<button class="btn ghost" data-act="new-run" style="width:100%">+ New run</button>`:`<div class="empty">No runs yet for ${name}.<br>Build a run from their tricks, then tick each one landed or missed.<br><button class="btn" data-act="new-run">Start a run</button></div>`;
+
+  $('#goalCount').textContent=goals.length?`${gDone} of ${goals.length} done`:'';
+  const gs=goals.slice().sort((a,b)=>(a.done-b.done)||((a.due||'9')<(b.due||'9')?-1:1));
+  $('#goals').innerHTML=gs.length?gs.map(goalRow).join('')+`<button class="btn ghost" data-act="add-goal" style="width:100%">+ Add a goal</button>`:`<div class="empty">No goals for ${name} yet.<br>Try “Land a kickflip by the holidays” or “Drop in on the big bowl”.<br><button class="btn" data-act="add-goal">Set a goal</button></div>`;
+
+  const locs=sortedLocs();
+  $('#locCount').textContent=locs.length?`${locs.length} spot${locs.length===1?'':'s'}`:'';
+  $('#locs').innerHTML=locs.length?locs.map(l=>{const n=mine.filter(t=>t.locId===l.id).length;const armed=pendingLocDel===l.id;return `<div class="loc"><span class="ln">${esc(l.name)}</span><span class="lbl">${n} trick${n===1?'':'s'}</span><button class="x ${armed?'armed':''}" data-ldel="${esc(l.id)}">${armed?'Tap to delete':'Delete'}</button></div>`}).join(''):`<div class="empty">No locations yet. Add a park or spot above, then pick it on any trick.</div>`;
+
+  $('#footnote').textContent=store.mode==='db'?'Synced through your family login, so it matches on every phone and laptop. Tap the selected skater for names, photos, backups and sign out.':'';
+}
+function trickRow(t){
+  const i=SIDX[t.status]??0;
+  const loc=t.locId&&state.locations.find(l=>l.id===t.locId);
+  const meta=[t.cat||'',loc?'at '+loc.name:'',t.landedAt?'First landed '+fmtDate(t.landedAt):''].filter(Boolean).join(' · ');
+  const next=STATUSES[i+1];
+  return `<div class="trick">
+    <span class="pips" data-s="${esc(t.status)}" aria-label="${STATUSES[i].label}">${[0,1,2,3].map(n=>`<i class="${n<=i?'on':''}"></i>`).join('')}</span>
+    <button class="t" data-edit="${t.id}" style="border:0;background:none;padding:0;text-align:left"><div class="tn">${esc(fullName(t))}</div>${meta||t.notes?`<div class="tm">${esc(meta)}${t.notes?(meta?' · ':'')+esc(t.notes):''}</div>`:''}</button>
+    ${next?`<button class="go" data-up="${t.id}">${next.k==='landed'?'Landed!':next.k==='locked'?'Lock in':'Start'}</button>`:''}
+  </div>`;
+}
+function goalRow(g){
+  let when='';
+  if(g.done)when='Done '+fmtDate(g.doneAt);
+  else if(g.due){const d=daysTo(g.due);when=d<0?`<span class="late">${-d} day${d===-1?'':'s'} past ${fmtDate(g.due)}</span>`:d===0?'Due today':`By ${fmtDate(g.due)} · ${d} day${d===1?'':'s'} left`}
+  return `<div class="goal ${g.done?'done':''}">
+    <button class="chk" data-done="${g.id}" aria-label="${g.done?'Mark not done':'Mark done'}">${g.done?'✓':''}</button>
+    <div class="t"><div class="gt">${esc(g.text)}</div>${when?`<div class="gm">${when}</div>`:''}</div>
+    <button class="x" data-gedit="${g.id}">Edit</button>
+  </div>`;
+}
+
+/* ---------- sheets ---------- */
+function openSheet(html,bind){
+  const f0=sheetOnClose;sheetOnClose=null;f0&&f0();
+  $('#sheetHost').innerHTML=`<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`;
+  $('#scrim').addEventListener('click',e=>{if(e.target.id==='scrim')closeSheet()});
+  bind&&bind($('#sheetHost .sheet'));
+  const f=$('#sheetHost input,#sheetHost button');f&&f.focus({preventScroll:true});
+}
+function closeSheet(){const f=sheetOnClose;sheetOnClose=null;f&&f();$('#sheetHost').innerHTML=''}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet()});
+
+function addMenu(){
+  openSheet(`<h2>Add for ${esc(state.riders[ui.rider].name)}</h2>
+    <div class="row"><button class="btn" id="m1">Tricks</button><button class="btn ghost" id="m2">A goal</button></div>
+    <button class="btn ghost" id="m3">Rename skaters</button>`,s=>{
+    s.querySelector('#m1').onclick=trickSheet;s.querySelector('#m2').onclick=()=>goalSheet();s.querySelector('#m3').onclick=namesSheet;
+  });
+}
+
+function trickSheet(){
+  let cat=ui.filter!=='all'?ui.filter:CAT_NAMES[0],stance='Regular';
+  const sn=n=>stance==='Regular'?n:stance+' '+n.charAt(0).toLowerCase()+n.slice(1);
+  const key=(n,c)=>n.toLowerCase()+'|'+(c||'');
+  const have=new Set(state.tricks.filter(t=>t.rider===ui.rider).map(t=>key(fullName(t),t.cat)));
+  const draw=s=>{
+    s.querySelector('#cats').innerHTML=CAT_NAMES.map(c=>`<button class="chip" data-c="${esc(c)}" aria-pressed="${c===cat}">${esc(c)}</button>`).join('');
+    s.querySelectorAll('#stc button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.s===stance));
+    s.querySelector('#lib').innerHTML=CATS[cat].map(sn).map(n=>`<button data-n="${esc(n)}" class="${have.has(key(n,cat))?'have':''}">${esc(n)}</button>`).join('');
+  };
+  openSheet(`<h2>Add tricks</h2>
+    <p class="note" style="margin:0">Tap to add to the wishlist. You can move them along as they progress.</p>
+    <div class="filters" id="cats"></div>
+    <div class="seg seg4" id="stc" role="group" aria-label="Stance">${STANCES.map(s=>`<button data-s="${s}">${s}</button>`).join('')}</div>
+    <div class="lib" id="lib"></div>
+    <div class="field"><label class="lbl" for="own">Or type your own</label>
+      <div class="row"><input id="own" placeholder="e.g. Kickflip to fakie" autocomplete="off" style="flex:1"><button class="btn" id="ownAdd" style="flex:none">Add</button></div></div>
+    <button class="btn ghost" id="close">Done</button>`,s=>{
+    draw(s);
+    s.querySelector('#cats').onclick=e=>{const b=e.target.closest('[data-c]');if(b){cat=b.dataset.c;draw(s)}};
+    s.querySelector('#stc').onclick=e=>{const b=e.target.closest('[data-s]');if(b){stance=b.dataset.s;draw(s)}};
+    s.querySelector('#lib').onclick=e=>{const b=e.target.closest('[data-n]');if(!b||have.has(key(b.dataset.n,cat)))return;addTrick(b.dataset.n,cat);have.add(key(b.dataset.n,cat));draw(s)};
+    const own=s.querySelector('#own');
+    const addOwn=()=>{const v=own.value.trim();if(!v)return;addTrick(v,cat);have.add(key(v,cat));own.value='';draw(s)};
+    s.querySelector('#ownAdd').onclick=addOwn;own.addEventListener('keydown',e=>{if(e.key==='Enter')addOwn()});
+    s.querySelector('#close').onclick=closeSheet;
+  });
+}
+function addTrick(name,cat){
+  const id=uid();
+  store.put('tricks',id,{rider:ui.rider,name,cat,status:'wish',notes:'',created:Date.now(),updated:Date.now()});
+  toast(`Added ${name} · ${cat}`);
+}
+
+function editTrick(id){
+  const t=state.tricks.find(x=>x.id===id);if(!t)return;
+  let st=t.status,confirmDel=false;
+  openSheet(`<h2>${esc(fullName(t))}</h2>
+    <div class="field"><span class="lbl">Where it's at</span><div class="seg" id="st">${STATUSES.map(s=>`<button data-s="${s.k}">${s.label}</button>`).join('')}</div></div>
+    <div class="field"><label class="lbl" for="tname">Name</label><input id="tname" value="${esc(fullName(t))}"></div>
+    <div class="field"><label class="lbl" for="tcat">Type</label><select id="tcat">${CAT_NAMES.map(c=>`<option ${c===t.cat?'selected':''}>${esc(c)}</option>`).join('')}<option value="" ${t.cat&&!CAT_NAMES.includes(t.cat)?'':(!t.cat?'selected':'')}>Other</option></select></div>
+    <div class="field"><label class="lbl" for="tloc">Location</label><select id="tloc"><option value="">No location</option>${sortedLocs().map(l=>`<option value="${esc(l.id)}" ${l.id===t.locId?'selected':''}>${esc(l.name)}</option>`).join('')}</select>${state.locations.length?'':'<span class="note">Add spots in the Locations section to pick one here.</span>'}</div>
+    <div class="field"><label class="lbl" for="tland">First landed</label><input id="tland" type="date" value="${esc(t.landedAt||'')}"></div>
+    <div class="field"><label class="lbl" for="tnotes">Notes</label><textarea id="tnotes" placeholder="Where, how it felt, what to fix next">${esc(t.notes||'')}</textarea></div>
+    <div class="row"><button class="btn" id="save">Save</button><button class="btn ghost" id="cancel">Cancel</button></div>
+    <button class="btn danger" id="del">Delete trick</button>`,s=>{
+    const mark=()=>{s.querySelectorAll('#st button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.s===st))};mark();
+    s.querySelector('#st').onclick=e=>{const b=e.target.closest('[data-s]');if(b){st=b.dataset.s;if(SIDX[st]>=2&&!s.querySelector('#tland').value)s.querySelector('#tland').value=today();mark()}};
+    s.querySelector('#cancel').onclick=closeSheet;
+    s.querySelector('#save').onclick=()=>{
+      const {id:_,...rest}=t;
+      store.put('tricks',t.id,{...rest,name:s.querySelector('#tname').value.trim()||fullName(t),cat:s.querySelector('#tcat').value,stance:'',locId:s.querySelector('#tloc').value,status:st,landedAt:s.querySelector('#tland').value||'',notes:s.querySelector('#tnotes').value.trim(),updated:Date.now()});
+      closeSheet();
+    };
+    s.querySelector('#del').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('tricks',t.id);closeSheet();toast('Trick deleted')};
+  });
+}
+function levelUp(id){
+  const t=state.tricks.find(x=>x.id===id);if(!t)return;
+  const i=SIDX[t.status]??0;if(i>=3)return;
+  const ns=STATUSES[i+1].k;const {id:_,...rest}=t;
+  const row={...rest,status:ns,updated:Date.now()};
+  if(ns==='landed'&&!t.landedAt)row.landedAt=today();
+  store.put('tricks',id,row);
+  toast(ns==='landed'?`${t.name} landed! 🛹`:ns==='locked'?`${t.name} locked in`:`Working on ${t.name}`);
+}
+
+function goalSheet(id){
+  const g=id?state.goals.find(x=>x.id===id):null;let confirmDel=false;
+  openSheet(`<h2>${g?'Edit goal':'New goal for '+esc(state.riders[ui.rider].name)}</h2>
+    <div class="field"><label class="lbl" for="gtext">Goal</label><input id="gtext" value="${esc(g?.text||'')}" placeholder="e.g. Land a kickflip at the park"></div>
+    <div class="field"><label class="lbl" for="gdue">Target date (optional)</label><input id="gdue" type="date" value="${esc(g?.due||'')}"></div>
+    <div class="row"><button class="btn" id="save">${g?'Save':'Add goal'}</button><button class="btn ghost" id="cancel">Cancel</button></div>
+    ${g?'<button class="btn danger" id="del">Delete goal</button>':''}`,s=>{
+    s.querySelector('#cancel').onclick=closeSheet;
+    s.querySelector('#save').onclick=()=>{
+      const text=s.querySelector('#gtext').value.trim();if(!text){s.querySelector('#gtext').focus();return}
+      const base=g?(({id:_,...r})=>r)(g):{rider:ui.rider,done:false,created:Date.now()};
+      store.put('goals',g?g.id:uid(),{...base,text,due:s.querySelector('#gdue').value||''});
+      closeSheet();
+    };
+    if(g)s.querySelector('#del').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('goals',g.id);closeSheet();toast('Goal deleted')};
+  });
+}
+function toggleGoal(id){
+  const g=state.goals.find(x=>x.id===id);if(!g)return;const {id:_,...r}=g;
+  store.put('goals',id,{...r,done:!g.done,doneAt:!g.done?today():''});
+  if(!g.done)toast('Goal smashed!');
+}
+function shrinkPhoto(file){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file);const img=new Image();
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('bad'))};
+    img.onload=()=>{const S=240,c=document.createElement('canvas');c.width=c.height=S;const m=Math.min(img.naturalWidth,img.naturalHeight);
+      c.getContext('2d').drawImage(img,(img.naturalWidth-m)/2,(img.naturalHeight-m)/2,m,m,0,0,S,S);URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',0.82))};
+    img.src=url;
+  });
+}
+function namesSheet(){
+  const photos={a:state.riders.a.photo||'',b:state.riders.b.photo||''};
+  const block=(k,label)=>`<div class="field"><label class="lbl" for="n${k}">${label}</label>
+    <div class="who"><span class="av av-${k}" id="av${k}"></span><input id="n${k}" value="${esc(state.riders[k].name)}" style="flex:1;min-width:0"></div>
+    <div class="row"><label class="btn ghost filebtn" for="f${k}">Choose photo</label><input id="f${k}" type="file" accept="image/*" hidden><button class="btn ghost" id="r${k}">Remove photo</button></div></div>`;
+  openSheet(`<h2>Skaters</h2>${block('a','First skater')}${block('b','Second skater')}
+    <div class="row"><button class="btn" id="save">Save</button><button class="btn ghost" id="cancel">Cancel</button></div>
+    <span class="lbl">Background photo</span>
+    <div class="row"><label class="btn ghost filebtn" for="bgf">Choose background</label><input id="bgf" type="file" accept="image/*" hidden><button class="btn ghost" id="bgr">Remove background</button></div>
+    <span class="lbl">Backups</span>
+    <div class="row"><button class="btn ghost" id="exp">Export backup</button><label class="btn ghost filebtn" for="imp">Import backup</label><input id="imp" type="file" accept="application/json,.json" hidden></div>
+    <button class="btn ghost" id="signout">Sign out</button>`,s=>{
+    s.querySelector('#bgr').hidden=!state.bg;
+    s.querySelector('#bgf').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+      try{const photo=await shrinkBg(f);store.db&&store.db.doc('app/background').set({photo}).catch(saveErr);state.bg=photo;applyBg();s.querySelector('#bgr').hidden=false;toast('Background updated')}
+      catch(err){toast('That photo couldn’t be opened. Try a different one.')}});
+    s.querySelector('#bgr').onclick=()=>{store.db&&store.db.doc('app/background').set({photo:''}).catch(saveErr);state.bg='';applyBg();s.querySelector('#bgr').hidden=true;toast('Background removed')};
+    s.querySelector('#exp').onclick=exportData;
+    s.querySelector('#imp').addEventListener('change',e=>{const f=e.target.files[0];if(f){closeSheet();importData(f)}e.target.value=''});
+    s.querySelector('#signout').onclick=()=>{closeSheet();if(window.firebase&&firebase.apps.length)firebase.auth().signOut();else toast('Sign out works on the live site')};
+    const show=k=>{const n=s.querySelector('#n'+k).value.trim()||'?';s.querySelector('#av'+k).innerHTML=photos[k]?`<img src="${esc(photos[k])}" alt="">`:esc(n[0].toUpperCase());s.querySelector('#r'+k).hidden=!photos[k]};
+    ['a','b'].forEach(k=>{
+      show(k);
+      s.querySelector('#n'+k).addEventListener('input',()=>show(k));
+      s.querySelector('#f'+k).addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{photos[k]=await shrinkPhoto(f);show(k)}catch(err){toast('That photo couldn’t be opened. Try a different one.')}e.target.value=''});
+      s.querySelector('#r'+k).onclick=()=>{photos[k]='';show(k)};
+    });
+    s.querySelector('#cancel').onclick=closeSheet;
+    s.querySelector('#save').onclick=()=>{store.putRiders({a:{name:s.querySelector('#na').value.trim()||'Skater 1',photo:photos.a},b:{name:s.querySelector('#nb').value.trim()||'Skater 2',photo:photos.b}});closeSheet();toast('Saved')};
+  });
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b||b.closest('#sheetHost'))return;
+  if(b.dataset.r){if(b.dataset.r===ui.rider){namesSheet();return}ui.rider=b.dataset.r;saveUI();render();return}
+  if(b.dataset.f){ui.filter=b.dataset.f;render();return}
+  if(b.dataset.up){levelUp(b.dataset.up);return}
+  if(b.dataset.edit){editTrick(b.dataset.edit);return}
+  if(b.dataset.done){toggleGoal(b.dataset.done);return}
+  if(b.dataset.gedit){goalSheet(b.dataset.gedit);return}
+  if(b.dataset.act==='add-trick'){trickSheet();return}
+  if(b.dataset.act==='add-goal'){goalSheet();return}
+  if(b.dataset.act==='new-run'){newRun();return}
+  if(b.dataset.run){runSheet(b.dataset.run);return}
+  if(b.id==='addLoc'){addLoc();return}
+  if(b.dataset.ldel){delLoc(b.dataset.ldel);return}
+  if(b.id==='fab'){addMenu();return}
+});
+document.getElementById('riders').addEventListener('dblclick',namesSheet);
+
+function sortedLocs(){return state.locations.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)))}
+function addLoc(){
+  const i=$('#newLoc');const v=i.value.trim();if(!v){i.focus();return}
+  if(state.locations.some(l=>String(l.name).toLowerCase()===v.toLowerCase())){toast(`${v} is already on the list`);return}
+  store.put('locations',uid(),{name:v,created:Date.now()});i.value='';toast(`Added ${v}`);
+}
+function delLoc(id){
+  if(pendingLocDel!==id){pendingLocDel=id;render();clearTimeout(delLoc.t);delLoc.t=setTimeout(()=>{pendingLocDel=null;render()},4000);return}
+  pendingLocDel=null;store.del('locations',id);toast('Location deleted');
+}
+document.getElementById('newLoc').addEventListener('keydown',e=>{if(e.key==='Enter')addLoc()});
+
+/* ---------- runs ---------- */
+function nowLocal(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`}
+const fmtDT=at=>{if(!at)return'';const d=new Date(at);return isNaN(d)?'':d.toLocaleString(undefined,{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})};
+function runScore(r){const it=r.items||[];return{land:it.filter(i=>i.res==='land').length,miss:it.filter(i=>i.res==='miss').length,total:it.length}}
+function runRow(r){
+  const sc=runScore(r);const loc=r.locId&&state.locations.find(l=>l.id===r.locId);
+  const meta=[fmtDT(r.at),loc?loc.name:''].filter(Boolean).join(' · ');
+  return `<button class="runrow" data-run="${esc(r.id)}"><span class="t"><span class="tn">${esc(r.name||'Run')}</span>${meta?`<span class="tm">${esc(meta)}</span>`:''}${sc.total?`<span class="marks" aria-hidden="true">${(r.items||[]).map(i=>`<i class="${esc(i.res||'')}"></i>`).join('')}</span>`:''}</span><span class="score" aria-label="${sc.land} of ${sc.total} landed"><b>${sc.land}</b>/${sc.total}</span></button>`;
+}
+function newRun(){
+  const prev=state.runs.filter(r=>r.rider===ui.rider).sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+  const id=uid();
+  const data={rider:ui.rider,name:'Run '+(prev.length+1),locId:prev[0]?.locId||'',at:nowLocal(),items:[],created:Date.now(),updated:Date.now()};
+  store.put('runs',id,data);runSheet(id,data);
+}
+function runSheet(id,initial){
+  const src=initial||state.runs.find(r=>r.id===id);if(!src)return;
+  const d=JSON.parse(JSON.stringify(src));delete d.id;d.items=d.items||[];
+  let confirmDel=false,timer=null,chain=Promise.resolve();
+  const flush=()=>{clearTimeout(timer);timer=null;d.updated=Date.now();const snap=JSON.parse(JSON.stringify(d));chain=chain.then(()=>store.put('runs',id,snap))};
+  const save=()=>{clearTimeout(timer);timer=setTimeout(flush,400)};
+  const myTricks=()=>state.tricks.filter(t=>t.rider===d.rider).sort((a,b)=>fullName(a).localeCompare(fullName(b)));
+  const who=esc(state.riders[d.rider]?.name||'they');
+  openSheet(`<h2>Run</h2>
+    <div class="field"><label class="lbl" for="rname">Name</label><input id="rname" value="${esc(d.name)}"></div>
+    <div class="row"><div class="field" style="flex:1;min-width:150px"><label class="lbl" for="rat">Date & time</label><input id="rat" type="datetime-local" value="${esc(d.at)}"></div>
+      <div class="field" style="flex:1;min-width:150px"><label class="lbl" for="rloc">Location</label><select id="rloc"><option value="">No location</option>${sortedLocs().map(l=>`<option value="${esc(l.id)}" ${l.id===d.locId?'selected':''}>${esc(l.name)}</option>`).join('')}</select></div></div>
+    <div class="sh"><span class="lbl">Tricks in this run</span><span class="lbl" id="rscore"></span></div>
+    <div id="ritems" class="group"></div>
+    <div class="field"><label class="lbl" for="radd">Add a trick</label><div class="row"><select id="radd" style="flex:1;min-width:0"></select><button class="btn" id="raddBtn" style="flex:none">Add</button></div></div>
+    <div class="row"><button class="btn" id="rdone">Done</button><button class="btn ghost" id="ragain">Try this run again</button></div>
+    <button class="btn danger" id="rdel">Delete run</button>`,s=>{
+    const draw=()=>{
+      const sc=runScore(d);
+      s.querySelector('#rscore').textContent=d.items.length?`${sc.land} landed · ${sc.miss} missed`:'';
+      s.querySelector('#ritems').innerHTML=d.items.length?d.items.map((it,i)=>`<div class="ri"><span class="num">${i+1}</span><span class="n">${esc(it.name)}</span>
+        <button class="mk ok" data-i="${i}" data-v="land" aria-pressed="${it.res==='land'}" aria-label="Landed">✓</button>
+        <button class="mk no" data-i="${i}" data-v="miss" aria-pressed="${it.res==='miss'}" aria-label="Missed">✕</button>
+        <button class="rm" data-rm="${i}">Remove</button></div>`).join(''):`<div class="empty">Add tricks below in the order ${who} will skate them.</div>`;
+      const list=myTricks();
+      s.querySelector('#radd').innerHTML=list.length?list.map(t=>`<option value="${esc(t.id)}">${esc(fullName(t))}${t.cat?' · '+esc(t.cat):''}</option>`).join(''):'<option value="">Add tricks to the trick list first</option>';
+    };
+    draw();
+    s.querySelector('#ritems').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+      if(b.dataset.rm!==undefined){d.items.splice(+b.dataset.rm,1);draw();save();return}
+      const it=d.items[+b.dataset.i];if(!it)return;it.res=it.res===b.dataset.v?'':b.dataset.v;draw();save()};
+    s.querySelector('#raddBtn').onclick=()=>{const t=state.tricks.find(x=>x.id===s.querySelector('#radd').value);if(!t)return;d.items.push({tid:t.id,name:fullName(t),res:''});draw();save()};
+    s.querySelector('#rname').addEventListener('input',e=>{d.name=e.target.value;save()});
+    s.querySelector('#rat').addEventListener('change',e=>{d.at=e.target.value;save()});
+    s.querySelector('#rloc').addEventListener('change',e=>{d.locId=e.target.value;save()});
+    s.querySelector('#rdone').onclick=closeSheet;
+    s.querySelector('#ragain').onclick=()=>{if(timer)flush();const nid=uid();const nd={...JSON.parse(JSON.stringify(d)),at:nowLocal(),items:d.items.map(i=>({tid:i.tid,name:i.name,res:''})),created:Date.now(),updated:Date.now()};sheetOnClose=null;chain.then(()=>store.put('runs',nid,nd));runSheet(nid,nd);toast('New attempt started')};
+    s.querySelector('#rdel').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}clearTimeout(timer);timer=null;sheetOnClose=null;chain.then(()=>store.del('runs',id));closeSheet();toast('Run deleted')};
+  });
+  sheetOnClose=()=>{if(timer)flush()};
+}
+
+boot();
+</script>
+</body>
+</html>
