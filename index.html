@@ -248,22 +248,22 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
     <div id="runs" class="group"></div>
   </section>
 
-  <section>
-    <div class="sh"><h2>Boards</h2><span class="lbl" id="boardCount"></span></div>
-    <div id="boards" class="group"></div>
-  </section>
-
-  <section>
-    <div class="sh"><h2>Shoes</h2><span class="lbl" id="shoeCount"></span></div>
-    <div id="shoes" class="group"></div>
-  </section>
-
 
   <section>
     <div class="sh"><h2>Locations</h2><span class="lbl" id="locCount"></span></div>
     <div class="field"><label class="lbl" for="newLoc">Add a skatepark or spot</label>
       <div class="row"><input id="newLoc" placeholder="e.g. Local skatepark, school stairs" autocomplete="off" style="flex:1"><button class="btn" id="addLoc" style="flex:none">Add</button></div></div>
     <div id="locs" class="group"></div>
+  </section>
+
+  <section>
+    <div class="sh"><h2>Decks</h2><span class="lbl" id="boardCount"></span></div>
+    <div id="boards" class="group"></div>
+  </section>
+
+  <section>
+    <div class="sh"><h2>Shoes</h2><span class="lbl" id="shoeCount"></span></div>
+    <div id="shoes" class="group"></div>
   </section>
 
   <p class="note" id="footnote"></p>
@@ -479,12 +479,12 @@ function render(){
 
   const locs=sortedLocs();
   const boards=state.boards.filter(b=>b.rider===R).sort((a,b)=>(!!b.current-!!a.current)||String(b.firstSkated||'').localeCompare(String(a.firstSkated||'')));
-  $('#boardCount').textContent=boards.length>1?`${boards.length} boards`:'';
+  $('#boardCount').textContent=boards.length>1?`${boards.length} decks`:'';
   const cur=boards.find(b=>b.current),past=boards.filter(b=>!b.current);
-  $('#boards').innerHTML=boards.length?(cur?boardCard(cur):`<div class="empty" style="padding:12px">No board marked as the one ${name} rides now.</div>`)
-    +(past.length?`<span class="lbl" style="margin-top:4px">Previous boards</span>`+past.map(boardRow).join(''):'')
-    +`<button class="btn ghost" data-act="add-board" style="width:100%">+ Add a board</button>`
-    :`<div class="empty">No board saved for ${name} yet.<br>Add the deck he rides now: brand, size, dimensions, wheelbase and when he first skated it.<br><button class="btn" data-act="add-board">Add his board</button></div>`;
+  $('#boards').innerHTML=boards.length?(cur?boardCard(cur):`<div class="empty" style="padding:12px">No deck marked as the one ${name} rides now.</div>`)
+    +(past.length?`<span class="lbl" style="margin-top:4px">Previous decks</span>`+past.map(boardRow).join(''):'')
+    +`<button class="btn ghost" data-act="add-board" style="width:100%">+ Add a deck</button>`
+    :`<div class="empty">No deck saved for ${name} yet.<br>Add the deck he rides now: brand, size, dimensions, wheelbase and when he first skated it.<br><button class="btn" data-act="add-board">Add his deck</button></div>`;
 
   const shoes=state.shoes.filter(x=>x.rider===R).sort((a,b)=>(!!b.current-!!a.current)||String(b.firstSkated||'').localeCompare(String(a.firstSkated||'')));
   $('#shoeCount').textContent=shoes.length>1?`${shoes.length} pairs`:'';
@@ -784,7 +784,7 @@ function locSheet(id){
 /* ---------- boards ---------- */
 function daysSince(iso){if(!iso)return null;const d=daysTo(iso);return -d}
 function boardSince(b){const n=daysSince(b.firstSkated);if(n===null)return'';if(n<0)return'First skate '+fmtDate(b.firstSkated);return `Skating it since ${fmtDate(b.firstSkated)}${new Date(b.firstSkated).getFullYear()!==new Date().getFullYear()?' '+new Date(b.firstSkated).getFullYear():''} · ${n===0?'today':n+' day'+(n===1?'':'s')}`}
-function boardTitle(b){return [b.brand,b.size].filter(Boolean).join(' ')||'Board'}
+function boardTitle(b){return [b.brand,b.size].filter(Boolean).join(' ')||'Deck'}
 function boardCard(b){
   const spec=[['Size',b.size],['Dimensions',b.dims],['Wheelbase',b.wheelbase]].filter(x=>x[1]);
   return `<button class="bcard" data-board="${esc(b.id)}"><span class="lbl">Riding now</span><span class="bt">${esc(boardTitle(b))}</span>
@@ -800,16 +800,16 @@ function boardSheet(id){
   const rider=b?b.rider:ui.rider;const who=esc(state.riders[rider]?.name||'this skater');
   const firstBoard=!state.boards.some(x=>x.rider===rider);
   let confirmDel=false,isCur=b?!!b.current:true;
-  openSheet(`<h2>${b?'Edit board':'New board for '+who}</h2>
+  openSheet(`<h2>${b?'Edit deck':'New deck for '+who}</h2>
     <div class="field"><label class="lbl" for="bbrand">Brand</label><input id="bbrand" value="${esc(b?.brand||'')}" placeholder="e.g. Baker, Element, Santa Cruz" autocomplete="off"></div>
     <div class="row"><div class="field" style="flex:1;min-width:120px"><label class="lbl" for="bsize">Size</label><input id="bsize" value="${esc(b?.size||'')}" placeholder='e.g. 8.0"' autocomplete="off"></div>
       <div class="field" style="flex:1;min-width:120px"><label class="lbl" for="bwb">Wheelbase</label><input id="bwb" value="${esc(b?.wheelbase||'')}" placeholder='e.g. 14.25"' autocomplete="off"></div></div>
     <div class="field"><label class="lbl" for="bdims">Dimensions</label><input id="bdims" value="${esc(b?.dims||'')}" placeholder='e.g. 8.0" x 31.5"' autocomplete="off"></div>
     <div class="field"><label class="lbl" for="bfirst">First skated</label><input id="bfirst" type="date" value="${esc(b?.firstSkated||(b?'':today()))}"></div>
     <div class="field"><label class="lbl" for="bnotes">Notes</label><textarea id="bnotes" placeholder="Trucks, wheels, grip, how it feels">${esc(b?.notes||'')}</textarea></div>
-    <div class="field"><span class="lbl">Is ${who} riding it now?</span><div class="seg" id="bcur"><button data-v="1">Yes, current board</button><button data-v="0">No, an old board</button></div></div>
+    <div class="field"><span class="lbl">Is ${who} riding it now?</span><div class="seg" id="bcur"><button data-v="1">Yes, current deck</button><button data-v="0">No, an old deck</button></div></div>
     <div class="row"><button class="btn" id="bsave">Save</button><button class="btn ghost" id="bcancel">Cancel</button></div>
-    ${b?'<button class="btn danger" id="bdel">Delete board</button>':''}`,s=>{
+    ${b?'<button class="btn danger" id="bdel">Delete deck</button>':''}`,s=>{
     const mark=()=>s.querySelectorAll('#bcur button').forEach(x=>x.setAttribute('aria-pressed',(x.dataset.v==='1')===isCur));mark();
     s.querySelector('#bcur').onclick=e=>{const x=e.target.closest('[data-v]');if(x){isCur=x.dataset.v==='1';mark()}};
     s.querySelector('#bcancel').onclick=closeSheet;
@@ -820,9 +820,9 @@ function boardSheet(id){
       const base=b?(({id:_,...r})=>r)(b):{rider,created:Date.now()};
       store.put('boards',bid,{...base,brand:v('#bbrand'),size:v('#bsize'),dims:v('#bdims'),wheelbase:v('#bwb'),firstSkated:s.querySelector('#bfirst').value||'',notes:v('#bnotes'),current:isCur,updated:Date.now()});
       if(isCur)state.boards.filter(x=>x.rider===rider&&x.id!==bid&&x.current).forEach(x=>{const {id:_,...r}=x;store.put('boards',x.id,{...r,current:false,updated:Date.now()})});
-      closeSheet();toast(firstBoard?'Board saved':'Saved');
+      closeSheet();toast(firstBoard?'Deck saved':'Saved');
     };
-    if(b)s.querySelector('#bdel').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('boards',b.id);closeSheet();toast('Board deleted')};
+    if(b)s.querySelector('#bdel').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('boards',b.id);closeSheet();toast('Deck deleted')};
   });
 }
 /* ---------- shoes ---------- */
