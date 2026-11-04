@@ -825,7 +825,7 @@ function locSheet(id){
       ${ts.length?`<span class="lbl">Tricks</span>`+ts.map(t=>{const S=STATUSES[SIDX[t.status]??0];const m=[t.obstacle?'on '+t.obstacle:'',t.cat||''].filter(Boolean).join(' · ');return `<button class="ltr" data-edit="${esc(t.id)}"><span class="n">${esc(fullName(t))}${m?`<span class="m">${esc(m)}</span>`:''}</span><span class="tag s-${esc(t.status)}">${S.short}</span></button>`}).join(''):''}
       ${rs.length?`<span class="lbl">Runs</span>`+rs.map(r=>{const sc=runScore(r);return `<button class="ltr" data-run="${esc(r.id)}"><span class="n">${esc(r.name||'Run')}<span class="m">${esc(fmtDT(r.at))}</span></span><span class="lbl" style="color:var(--ink)">${sc.land}/${sc.total} landed</span></button>`}).join(''):''}`;
   };
-  const body=part('a')+part('b');
+  const body=(ui.rider==='b'?['b','a']:['a','b']).map(part).join('');
   openSheet(`<h2>${esc(l.name)}</h2>
     <div class="field"><label class="lbl" for="lobsIn">Obstacles here</label><span class="note" id="lobsHint">Tap an obstacle to add tricks on it.</span><div class="lib" id="lobs"></div>
       <div class="row"><input id="lobsIn" list="obsList" placeholder="e.g. Hubba, flat bar, 5 stair rail" autocomplete="off" style="flex:1"><button class="btn" id="lobsAdd" style="flex:none">Add</button></div>
