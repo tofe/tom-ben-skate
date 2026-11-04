@@ -587,8 +587,8 @@ function render(){
     return `<div class="loc ${l.hidden?'hiddenloc':''}" ${l.hidden?'':`data-sortitem="loc" data-key="${esc(l.id)}"`}>${l.hidden?'':`<button class="handle" data-drag aria-label="Drag to move ${esc(l.name)}">${GRIP}</button>`}<button class="ln locopen" data-loc="${esc(l.id)}">${esc(l.name)}<span class="lc">${nt} trick${nt===1?'':'s'} · ${nr} run${nr===1?'':'s'} · ${no} obstacle${no===1?'':'s'} ›</span></button>
       <button class="x" data-lhide="${esc(l.id)}">${l.hidden?'Show':'Hide'}</button>${l.hidden?`<button class="x ${armed?'armed':''}" data-ldel="${esc(l.id)}">${armed?'Tap to delete':'Delete'}</button>`:''}</div>`};
   $('#locs').innerHTML=locs.length?(visLocs.map(locRow).join('')||'<div class="empty" style="padding:12px">All spots are hidden.</div>')
-    +(hidLocs.length?`<button class="btn ghost" data-act="toggle-hidden" style="width:100%">${ui.showHidden?'Hide hidden spots':`Show ${hidLocs.length} hidden spot${hidLocs.length===1?'':'s'}`}</button>`+(ui.showHidden?hidLocs.map(locRow).join(''):''):'')
-    +`<button class="btn ghost" data-act="add-loc" style="width:100%">+ Add a location</button>`
+    +`<div class="row"><button class="btn ghost" data-act="add-loc" style="flex:1">+ Add a location</button>${hidLocs.length?`<button class="btn ghost" data-act="toggle-hidden" style="flex:1">${ui.showHidden?'Hide hidden':`Show ${hidLocs.length} hidden`}</button>`:''}</div>`
+    +(hidLocs.length&&ui.showHidden?hidLocs.map(locRow).join(''):'')
     :`<div class="empty">No locations yet. Add a skatepark or spot, then pick it on any trick or run.<br><button class="btn" data-act="add-loc">Add a location</button></div>`;
 
   $('#footnote').textContent=store.mode==='db'?'Synced through your family login, so it matches on every phone and laptop. Tap the selected skater for names, photos, backups and sign out.':'';
