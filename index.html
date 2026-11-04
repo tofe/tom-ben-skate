@@ -147,6 +147,12 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .ochip small{font-family:var(--label);color:var(--muted)}
 .ochip button{border:0;background:var(--line);color:var(--ink);width:24px;height:24px;border-radius:50%;padding:0;line-height:1;font-size:15px}
 .trick .tm.needs{color:var(--warn);font-weight:600}
+.bcard{display:flex;flex-direction:column;align-items:flex-start;gap:8px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--rider);border-radius:var(--r);padding:14px 16px}
+.bcard .bt{font-family:var(--display);font-size:22px;line-height:1.1;overflow-wrap:anywhere}
+.bspec{display:flex;flex-wrap:wrap;gap:8px 20px}
+.bspec>span{display:flex;flex-direction:column;gap:1px}
+.bspec b{font-size:17px;font-variant-numeric:tabular-nums}
+.bcard .bm{font-size:14px;color:var(--muted);overflow-wrap:anywhere}
 .ltr{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;text-align:left;width:100%}
 .ltr .n{flex:1;min-width:0;font-weight:700;overflow-wrap:anywhere}
 .ltr .m{display:block;font-weight:400;font-size:14px;color:var(--muted)}
@@ -242,6 +248,16 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
     <div id="runs" class="group"></div>
   </section>
 
+  <section>
+    <div class="sh"><h2>Boards</h2><span class="lbl" id="boardCount"></span></div>
+    <div id="boards" class="group"></div>
+  </section>
+
+  <section>
+    <div class="sh"><h2>Shoes</h2><span class="lbl" id="shoeCount"></span></div>
+    <div id="shoes" class="group"></div>
+  </section>
+
 
   <section>
     <div class="sh"><h2>Locations</h2><span class="lbl" id="locCount"></span></div>
@@ -288,7 +304,7 @@ const locName=id=>state.locations.find(l=>l.id===id)?.name||'';
 const obstaclesOf=id=>{const l=state.locations.find(x=>x.id===id);return Array.isArray(l?.obstacles)?l.obstacles:[]};
 const fullName=t=>t.stance&&t.stance!=='Regular'&&!t.name.toLowerCase().startsWith(t.stance.toLowerCase())?t.stance+' '+t.name.charAt(0).toLowerCase()+t.name.slice(1):t.name;
 
-let state={riders:{a:{name:'Skater 1'},b:{name:'Skater 2'}},tricks:[],goals:[],locations:[],runs:[]};
+let state={riders:{a:{name:'Skater 1'},b:{name:'Skater 2'}},tricks:[],goals:[],locations:[],runs:[],boards:[],shoes:[]};
 let sheetOnClose=null;
 let pendingLocDel=null;
 let ui={rider:'a',filter:'all'};
@@ -327,7 +343,7 @@ function showApp(on){$('#app').hidden=!on;$('#login').hidden=on}
 
 function boot(){
   render();
-  if(window.PREVIEW_DATA){const d=window.PREVIEW_DATA;state.riders=d.riders||state.riders;['tricks','goals','locations','runs'].forEach(k=>state[k]=d[k]||[]);state.bg=d.background||'';applyBg();showApp(true);$('#sync').textContent='Preview · not saved';render();return}
+  if(window.PREVIEW_DATA){const d=window.PREVIEW_DATA;state.riders=d.riders||state.riders;['tricks','goals','locations','runs','boards','shoes'].forEach(k=>state[k]=d[k]||[]);state.bg=d.background||'';applyBg();showApp(true);$('#sync').textContent='Preview · not saved';render();return}
   if(!window.firebase||String(firebaseConfig.apiKey).startsWith('PASTE')){
     showApp(false);
     $('#loginNote').textContent='Almost there. Paste your Firebase settings into index.html, as described in README.md.';
@@ -361,7 +377,7 @@ function convertSpots(){
     sp.slice(1).forEach((x,i)=>store.put('tricks',id+'-'+(i+1),{...rest,locId:x.locId,obstacle:x.obstacle||'',created:Date.now(),updated:Date.now()}));
   });
 }
-function stopSync(){subs.forEach(f=>f());subs=[];state.tricks=[];state.goals=[];state.locations=[];state.runs=[];state.bg='';applyBg();render()}
+function stopSync(){subs.forEach(f=>f());subs=[];state.tricks=[];state.goals=[];state.locations=[];state.runs=[];state.boards=[];state.shoes=[];state.bg='';applyBg();render()}
 function applyBg(){const el=$('#bgimg');el.style.backgroundImage=state.bg?`url("${state.bg}")`:'';el.hidden=!state.bg;document.body.classList.toggle('hasbg',!!state.bg)}
 function shrinkBg(file){
   return new Promise((res,rej)=>{
@@ -386,10 +402,12 @@ function startSync(){
   subs.push(db.doc('app/background').onSnapshot(s=>{state.bg=s.exists?(s.data().photo||''):'';applyBg()},fail));
   subs.push(db.collection('locations').onSnapshot(s=>{state.locations=rows(s);render()},fail));
   subs.push(db.collection('runs').onSnapshot(s=>{state.runs=rows(s);render()},fail));
+  subs.push(db.collection('boards').onSnapshot(s=>{state.boards=rows(s);render()},fail));
+  subs.push(db.collection('shoes').onSnapshot(s=>{state.shoes=rows(s);render()},fail));
 }
 
 function exportData(){
-  const out={app:'skate-log',version:1,exported:new Date().toISOString(),riders:state.riders,background:state.bg||'',tricks:state.tricks,goals:state.goals,locations:state.locations,runs:state.runs};
+  const out={app:'skate-log',version:1,exported:new Date().toISOString(),riders:state.riders,background:state.bg||'',tricks:state.tricks,goals:state.goals,locations:state.locations,runs:state.runs,boards:state.boards,shoes:state.shoes};
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,1)],{type:'application/json'}));
   a.download=`skate-log-backup-${today()}.json`;document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
@@ -400,7 +418,7 @@ async function importData(file){
   const ops=[];
   if(d.riders)ops.push(['app','riders',d.riders]);
   if(d.background)ops.push(['app','background',{photo:d.background}]);
-  ['tricks','goals','locations','runs'].forEach(c=>(d[c]||[]).forEach(({id,...rest})=>{if(id)ops.push([c,id,rest])}));
+  ['tricks','goals','locations','runs','boards','shoes'].forEach(c=>(d[c]||[]).forEach(({id,...rest})=>{if(id)ops.push([c,id,rest])}));
   toast(`Importing ${ops.length} items…`);
   try{
     for(let i=0;i<ops.length;i+=400){const b=store.db.batch();ops.slice(i,i+400).forEach(([c,id,data])=>b.set(store.db.doc(c+'/'+id),data));await b.commit()}
@@ -460,6 +478,22 @@ function render(){
   $('#goals').innerHTML=gs.length?gs.map(goalRow).join('')+`<button class="btn ghost" data-act="add-goal" style="width:100%">+ Add a goal</button>`:`<div class="empty">No goals for ${name} yet.<br>Try “Land a kickflip by the holidays” or “Drop in on the big bowl”.<br><button class="btn" data-act="add-goal">Set a goal</button></div>`;
 
   const locs=sortedLocs();
+  const boards=state.boards.filter(b=>b.rider===R).sort((a,b)=>(!!b.current-!!a.current)||String(b.firstSkated||'').localeCompare(String(a.firstSkated||'')));
+  $('#boardCount').textContent=boards.length>1?`${boards.length} boards`:'';
+  const cur=boards.find(b=>b.current),past=boards.filter(b=>!b.current);
+  $('#boards').innerHTML=boards.length?(cur?boardCard(cur):`<div class="empty" style="padding:12px">No board marked as the one ${name} rides now.</div>`)
+    +(past.length?`<span class="lbl" style="margin-top:4px">Previous boards</span>`+past.map(boardRow).join(''):'')
+    +`<button class="btn ghost" data-act="add-board" style="width:100%">+ Add a board</button>`
+    :`<div class="empty">No board saved for ${name} yet.<br>Add the deck he rides now: brand, size, dimensions, wheelbase and when he first skated it.<br><button class="btn" data-act="add-board">Add his board</button></div>`;
+
+  const shoes=state.shoes.filter(x=>x.rider===R).sort((a,b)=>(!!b.current-!!a.current)||String(b.firstSkated||'').localeCompare(String(a.firstSkated||'')));
+  $('#shoeCount').textContent=shoes.length>1?`${shoes.length} pairs`:'';
+  const curS=shoes.find(x=>x.current),pastS=shoes.filter(x=>!x.current);
+  $('#shoes').innerHTML=shoes.length?(curS?shoeCard(curS):`<div class="empty" style="padding:12px">No pair marked as the ones ${name} wears now.</div>`)
+    +(pastS.length?`<span class="lbl" style="margin-top:4px">Previous shoes</span>`+pastS.map(shoeRow).join(''):'')
+    +`<button class="btn ghost" data-act="add-shoe" style="width:100%">+ Add shoes</button>`
+    :`<div class="empty">No skate shoes saved for ${name} yet.<br>Add the pair he skates in now: brand, size, cost and first skate.<br><button class="btn" data-act="add-shoe">Add his shoes</button></div>`;
+
   $('#locCount').textContent=locs.length?`${locs.length} spot${locs.length===1?'':'s'}`:'';
   $('#locs').innerHTML=locs.length?locs.map(l=>{const nt=state.tricks.filter(t=>t.locId===l.id).length,nr=state.runs.filter(r=>r.locId===l.id).length;const no=obstaclesOf(l.id).length;const armed=pendingLocDel===l.id;return `<div class="loc"><button class="ln locopen" data-loc="${esc(l.id)}">${esc(l.name)}<span class="lc">${nt} trick${nt===1?'':'s'} · ${nr} run${nr===1?'':'s'} · ${no} obstacle${no===1?'':'s'} ›</span></button><button class="x ${armed?'armed':''}" data-ldel="${esc(l.id)}">${armed?'Tap to delete':'Delete'}</button></div>`}).join(''):`<div class="empty">No locations yet. Add a park or spot above, then pick it on any trick or run.</div>`;
 
@@ -701,6 +735,10 @@ document.addEventListener('click',e=>{
   if(b.dataset.act==='add-goal'){goalSheet();return}
   if(b.dataset.act==='new-run'){newRun();return}
   if(b.dataset.run){runSheet(b.dataset.run);return}
+  if(b.dataset.act==='add-board'){boardSheet();return}
+  if(b.dataset.act==='add-shoe'){shoeSheet();return}
+  if(b.dataset.shoe){shoeSheet(b.dataset.shoe);return}
+  if(b.dataset.board){boardSheet(b.dataset.board);return}
   if(b.id==='addLoc'){addLoc();return}
   if(b.dataset.ldel){delLoc(b.dataset.ldel);return}
   if(b.dataset.loc){locSheet(b.dataset.loc);return}
@@ -741,6 +779,92 @@ function locSheet(id){
     s.querySelector('#lobsIn').addEventListener('keydown',e=>{if(e.key==='Enter')addObs()});
     s.querySelector('#lobs').addEventListener('click',e=>{const b=e.target.closest('[data-orm]');if(!b)return;obs.splice(+b.dataset.orm,1);drawObs();saveObs()});
     s.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.edit)editTrick(b.dataset.edit);else if(b.dataset.run)runSheet(b.dataset.run)});
+  });
+}
+/* ---------- boards ---------- */
+function daysSince(iso){if(!iso)return null;const d=daysTo(iso);return -d}
+function boardSince(b){const n=daysSince(b.firstSkated);if(n===null)return'';if(n<0)return'First skate '+fmtDate(b.firstSkated);return `Skating it since ${fmtDate(b.firstSkated)}${new Date(b.firstSkated).getFullYear()!==new Date().getFullYear()?' '+new Date(b.firstSkated).getFullYear():''} · ${n===0?'today':n+' day'+(n===1?'':'s')}`}
+function boardTitle(b){return [b.brand,b.size].filter(Boolean).join(' ')||'Board'}
+function boardCard(b){
+  const spec=[['Size',b.size],['Dimensions',b.dims],['Wheelbase',b.wheelbase]].filter(x=>x[1]);
+  return `<button class="bcard" data-board="${esc(b.id)}"><span class="lbl">Riding now</span><span class="bt">${esc(boardTitle(b))}</span>
+    ${spec.length?`<span class="bspec">${spec.map(([k,v])=>`<span><span class="lbl">${k}</span><b>${esc(v)}</b></span>`).join('')}</span>`:''}
+    ${b.firstSkated?`<span class="bm">${esc(boardSince(b))}</span>`:''}${b.notes?`<span class="bm">${esc(b.notes)}</span>`:''}</button>`;
+}
+function boardRow(b){
+  const m=[b.size,b.dims,b.wheelbase?'WB '+b.wheelbase:'',b.firstSkated?'from '+fmtDate(b.firstSkated)+' '+new Date(b.firstSkated).getFullYear():''].filter(Boolean).join(' · ');
+  return `<button class="ltr" data-board="${esc(b.id)}" style="background:var(--surface)"><span class="n">${esc(boardTitle(b))}${m?`<span class="m">${esc(m)}</span>`:''}</span></button>`;
+}
+function boardSheet(id){
+  const b=id?state.boards.find(x=>x.id===id):null;if(id&&!b)return;
+  const rider=b?b.rider:ui.rider;const who=esc(state.riders[rider]?.name||'this skater');
+  const firstBoard=!state.boards.some(x=>x.rider===rider);
+  let confirmDel=false,isCur=b?!!b.current:true;
+  openSheet(`<h2>${b?'Edit board':'New board for '+who}</h2>
+    <div class="field"><label class="lbl" for="bbrand">Brand</label><input id="bbrand" value="${esc(b?.brand||'')}" placeholder="e.g. Baker, Element, Santa Cruz" autocomplete="off"></div>
+    <div class="row"><div class="field" style="flex:1;min-width:120px"><label class="lbl" for="bsize">Size</label><input id="bsize" value="${esc(b?.size||'')}" placeholder='e.g. 8.0"' autocomplete="off"></div>
+      <div class="field" style="flex:1;min-width:120px"><label class="lbl" for="bwb">Wheelbase</label><input id="bwb" value="${esc(b?.wheelbase||'')}" placeholder='e.g. 14.25"' autocomplete="off"></div></div>
+    <div class="field"><label class="lbl" for="bdims">Dimensions</label><input id="bdims" value="${esc(b?.dims||'')}" placeholder='e.g. 8.0" x 31.5"' autocomplete="off"></div>
+    <div class="field"><label class="lbl" for="bfirst">First skated</label><input id="bfirst" type="date" value="${esc(b?.firstSkated||(b?'':today()))}"></div>
+    <div class="field"><label class="lbl" for="bnotes">Notes</label><textarea id="bnotes" placeholder="Trucks, wheels, grip, how it feels">${esc(b?.notes||'')}</textarea></div>
+    <div class="field"><span class="lbl">Is ${who} riding it now?</span><div class="seg" id="bcur"><button data-v="1">Yes, current board</button><button data-v="0">No, an old board</button></div></div>
+    <div class="row"><button class="btn" id="bsave">Save</button><button class="btn ghost" id="bcancel">Cancel</button></div>
+    ${b?'<button class="btn danger" id="bdel">Delete board</button>':''}`,s=>{
+    const mark=()=>s.querySelectorAll('#bcur button').forEach(x=>x.setAttribute('aria-pressed',(x.dataset.v==='1')===isCur));mark();
+    s.querySelector('#bcur').onclick=e=>{const x=e.target.closest('[data-v]');if(x){isCur=x.dataset.v==='1';mark()}};
+    s.querySelector('#bcancel').onclick=closeSheet;
+    s.querySelector('#bsave').onclick=()=>{
+      const v=k=>s.querySelector(k).value.trim();
+      if(!v('#bbrand')&&!v('#bsize')&&!v('#bdims')){toast('Add at least a brand or size');s.querySelector('#bbrand').focus();return}
+      const bid=b?b.id:uid();
+      const base=b?(({id:_,...r})=>r)(b):{rider,created:Date.now()};
+      store.put('boards',bid,{...base,brand:v('#bbrand'),size:v('#bsize'),dims:v('#bdims'),wheelbase:v('#bwb'),firstSkated:s.querySelector('#bfirst').value||'',notes:v('#bnotes'),current:isCur,updated:Date.now()});
+      if(isCur)state.boards.filter(x=>x.rider===rider&&x.id!==bid&&x.current).forEach(x=>{const {id:_,...r}=x;store.put('boards',x.id,{...r,current:false,updated:Date.now()})});
+      closeSheet();toast(firstBoard?'Board saved':'Saved');
+    };
+    if(b)s.querySelector('#bdel').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('boards',b.id);closeSheet();toast('Board deleted')};
+  });
+}
+/* ---------- shoes ---------- */
+const money=v=>{const n=parseFloat(String(v).replace(/[^0-9.]/g,''));return isNaN(n)?'':'$'+(n%1?n.toFixed(2):n)};
+function shoeTitle(x){return x.brand||'Skate shoes'}
+function shoeCard(x){
+  const spec=[['Size',x.size],['Cost',x.cost?money(x.cost):'']].filter(v=>v[1]);
+  const n=x.firstSkated?daysSince(x.firstSkated):null;
+  return `<button class="bcard" data-shoe="${esc(x.id)}"><span class="lbl">Wearing now</span><span class="bt">${esc(shoeTitle(x))}</span>
+    ${spec.length?`<span class="bspec">${spec.map(([k,v])=>`<span><span class="lbl">${k}</span><b>${esc(v)}</b></span>`).join('')}</span>`:''}
+    ${x.firstSkated?`<span class="bm">${n>=0?`First skated ${fmtDate(x.firstSkated)} · ${n===0?'today':n+' day'+(n===1?'':'s')+' of skating'}`:'First skate '+fmtDate(x.firstSkated)}</span>`:''}${x.notes?`<span class="bm">${esc(x.notes)}</span>`:''}</button>`;
+}
+function shoeRow(x){
+  const m=[x.size?'Size '+x.size:'',x.cost?money(x.cost):'',x.firstSkated?'from '+fmtDate(x.firstSkated)+' '+new Date(x.firstSkated).getFullYear():''].filter(Boolean).join(' · ');
+  return `<button class="ltr" data-shoe="${esc(x.id)}" style="background:var(--surface)"><span class="n">${esc(shoeTitle(x))}${m?`<span class="m">${esc(m)}</span>`:''}</span></button>`;
+}
+function shoeSheet(id){
+  const x=id?state.shoes.find(y=>y.id===id):null;if(id&&!x)return;
+  const rider=x?x.rider:ui.rider;const who=esc(state.riders[rider]?.name||'this skater');
+  let confirmDel=false,isCur=x?!!x.current:true;
+  openSheet(`<h2>${x?'Edit shoes':'New shoes for '+who}</h2>
+    <div class="field"><label class="lbl" for="sbrand">Brand</label><input id="sbrand" value="${esc(x?.brand||'')}" placeholder="e.g. Vans Old Skool Pro, Nike SB Dunk Low" autocomplete="off"></div>
+    <div class="row"><div class="field" style="flex:1;min-width:120px"><label class="lbl" for="ssize">Size</label><input id="ssize" value="${esc(x?.size||'')}" placeholder="e.g. US 6" autocomplete="off"></div>
+      <div class="field" style="flex:1;min-width:120px"><label class="lbl" for="scost">Cost</label><input id="scost" inputmode="decimal" value="${esc(x?.cost||'')}" placeholder="e.g. 120" autocomplete="off"></div></div>
+    <div class="field"><label class="lbl" for="sfirst">First skated</label><input id="sfirst" type="date" value="${esc(x?.firstSkated||(x?'':today()))}"></div>
+    <div class="field"><label class="lbl" for="snotes">Notes</label><textarea id="snotes" placeholder="Where they're wearing through, how they grip">${esc(x?.notes||'')}</textarea></div>
+    <div class="field"><span class="lbl">Is ${who} wearing them now?</span><div class="seg" id="scur"><button data-v="1">Yes, current pair</button><button data-v="0">No, an old pair</button></div></div>
+    <div class="row"><button class="btn" id="ssave">Save</button><button class="btn ghost" id="scancel">Cancel</button></div>
+    ${x?'<button class="btn danger" id="sdel">Delete shoes</button>':''}`,s=>{
+    const mark=()=>s.querySelectorAll('#scur button').forEach(b=>b.setAttribute('aria-pressed',(b.dataset.v==='1')===isCur));mark();
+    s.querySelector('#scur').onclick=e=>{const b=e.target.closest('[data-v]');if(b){isCur=b.dataset.v==='1';mark()}};
+    s.querySelector('#scancel').onclick=closeSheet;
+    s.querySelector('#ssave').onclick=()=>{
+      const v=k=>s.querySelector(k).value.trim();
+      if(!v('#sbrand')&&!v('#ssize')){toast('Add at least a brand or size');s.querySelector('#sbrand').focus();return}
+      const sid=x?x.id:uid();
+      const base=x?(({id:_,...r})=>r)(x):{rider,created:Date.now()};
+      store.put('shoes',sid,{...base,brand:v('#sbrand'),size:v('#ssize'),cost:v('#scost').replace(/^\$/,''),firstSkated:s.querySelector('#sfirst').value||'',notes:v('#snotes'),current:isCur,updated:Date.now()});
+      if(isCur)state.shoes.filter(y=>y.rider===rider&&y.id!==sid&&y.current).forEach(y=>{const {id:_,...r}=y;store.put('shoes',y.id,{...r,current:false,updated:Date.now()})});
+      closeSheet();toast('Saved');
+    };
+    if(x)s.querySelector('#sdel').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('shoes',x.id);closeSheet();toast('Shoes deleted')};
   });
 }
 function sortedLocs(){return state.locations.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)))}
