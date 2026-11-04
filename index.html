@@ -165,6 +165,14 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .linkbtn{border:0;background:none;color:var(--rider);font-weight:700;font-size:15px;padding:2px 4px}
 .confirmbox{display:flex;flex-direction:column;gap:10px;border:1px solid var(--miss);background:var(--surface);border-radius:12px;padding:12px}
 .trick .tm.needs{color:var(--warn);font-weight:600}
+.gear{display:flex;align-items:baseline;gap:4px 10px;flex-wrap:wrap;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.gear.cur{border-left:5px solid var(--rider)}
+.gear .gt2{font-weight:700;font-size:16px;overflow-wrap:anywhere}
+.gear .gm2{font-family:var(--label);font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.gearbar{justify-content:space-between;align-items:center;flex-wrap:nowrap}
+.gearempty{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px dashed var(--line);border-radius:12px;padding:8px 8px 8px 12px;color:var(--muted);font-size:15px}
+.btn.sm{padding:7px 14px;font-size:14px;flex:none}
+.row .btn.sm{flex:none}
 .bcard{display:flex;flex-direction:column;align-items:flex-start;gap:8px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--rider);border-radius:var(--r);padding:14px 16px}
 .bcard .bt{font-family:var(--display);font-size:22px;line-height:1.1;overflow-wrap:anywhere}
 .bspec{display:flex;flex-wrap:wrap;gap:8px 20px}
@@ -568,18 +576,18 @@ function render(){
   const boards=state.boards.filter(b=>b.rider===R).sort((a,b)=>(!!b.current-!!a.current)||String(b.firstSkated||'').localeCompare(String(a.firstSkated||'')));
   $('#boardCount').textContent=boards.length>1?`${boards.length} decks`:'';
   const cur=boards.find(b=>b.current),past=boards.filter(b=>!b.current);
-  $('#boards').innerHTML=boards.length?(cur?boardCard(cur):`<div class="empty" style="padding:12px">No deck marked as the one ${name} rides now.</div>`)
-    +(past.length?`<span class="lbl" style="margin-top:4px">Previous decks</span>`+past.map(boardRow).join(''):'')
-    +`<button class="btn ghost" data-act="add-board" style="width:100%">+ Add a deck</button>`
-    :`<div class="empty">No deck saved for ${name} yet.<br>Add the deck he rides now: brand, size, dimensions, wheelbase and when he first skated it.<br><button class="btn" data-act="add-board">Add his deck</button></div>`;
+  $('#boards').innerHTML=gearBlock({cur,past,open:ui.pastDecks,toggle:'past-decks',add:'add-board',addLabel:'+ Add',noun:'deck',nouns:'decks',
+    curHtml:cur?gearRow('board',cur,boardTitle(cur),[cur.dims,cur.wheelbase?'WB '+cur.wheelbase:'',cur.firstSkated?daysLabel(cur.firstSkated):''],true):'',
+    rowHtml:b=>gearRow('board',b,boardTitle(b),[b.dims,b.firstSkated?'from '+fmtDate(b.firstSkated)+' '+new Date(b.firstSkated).getFullYear():''],false),
+    empty:`No deck saved for ${name} yet.`});
 
   const shoes=state.shoes.filter(x=>x.rider===R).sort((a,b)=>(!!b.current-!!a.current)||String(b.firstSkated||'').localeCompare(String(a.firstSkated||'')));
   $('#shoeCount').textContent=shoes.length>1?`${shoes.length} pairs`:'';
   const curS=shoes.find(x=>x.current),pastS=shoes.filter(x=>!x.current);
-  $('#shoes').innerHTML=shoes.length?(curS?shoeCard(curS):`<div class="empty" style="padding:12px">No pair marked as the ones ${name} wears now.</div>`)
-    +(pastS.length?`<span class="lbl" style="margin-top:4px">Previous shoes</span>`+pastS.map(shoeRow).join(''):'')
-    +`<button class="btn ghost" data-act="add-shoe" style="width:100%">+ Add shoes</button>`
-    :`<div class="empty">No skate shoes saved for ${name} yet.<br>Add the pair he skates in now: brand, size, cost and first skate.<br><button class="btn" data-act="add-shoe">Add his shoes</button></div>`;
+  $('#shoes').innerHTML=gearBlock({cur:curS,past:pastS,open:ui.pastShoes,toggle:'past-shoes',add:'add-shoe',addLabel:'+ Add',noun:'pair',nouns:'pairs',
+    curHtml:curS?gearRow('shoe',curS,shoeTitle(curS),[curS.size?'Size '+curS.size:'',curS.cost?money(curS.cost):'',curS.firstSkated?daysLabel(curS.firstSkated):''],true):'',
+    rowHtml:x=>gearRow('shoe',x,shoeTitle(x),[x.size?'Size '+x.size:'',x.cost?money(x.cost):'',x.firstSkated?'from '+fmtDate(x.firstSkated)+' '+new Date(x.firstSkated).getFullYear():''],false),
+    empty:`No skate shoes saved for ${name} yet.`});
 
   const visLocs=locs.filter(l=>!l.hidden),hidLocs=locs.filter(l=>l.hidden);
   $('#locCount').textContent=locs.length?`${visLocs.length} spot${visLocs.length===1?'':'s'}${hidLocs.length?` · ${hidLocs.length} hidden`:''}`:'';
@@ -882,6 +890,8 @@ document.addEventListener('click',e=>{
   if(b.dataset.run){runSheet(b.dataset.run);return}
   if(b.dataset.rg){runGroupSheet(b.dataset.rg);return}
   if(b.dataset.act==='add-board'){boardSheet();return}
+  if(b.dataset.act==='past-decks'){ui.pastDecks=!ui.pastDecks;render();return}
+  if(b.dataset.act==='past-shoes'){ui.pastShoes=!ui.pastShoes;render();return}
   if(b.dataset.act==='add-shoe'){shoeSheet();return}
   if(b.dataset.shoe){shoeSheet(b.dataset.shoe);return}
   if(b.dataset.board){boardSheet(b.dataset.board);return}
@@ -952,6 +962,17 @@ function locSheet(id){
 function daysSince(iso){if(!iso)return null;const d=daysTo(iso);return -d}
 function boardSince(b){const n=daysSince(b.firstSkated);if(n===null)return'';if(n<0)return'First skate '+fmtDate(b.firstSkated);return `Skating it since ${fmtDate(b.firstSkated)}${new Date(b.firstSkated).getFullYear()!==new Date().getFullYear()?' '+new Date(b.firstSkated).getFullYear():''} · ${n===0?'today':n+' day'+(n===1?'':'s')}`}
 function boardTitle(b){return [b.brand,b.size].filter(Boolean).join(' ')||'Deck'}
+function daysLabel(iso){const n=daysSince(iso);return n===null?'':n<0?'from '+fmtDate(iso):n===0?'new today':n+' day'+(n===1?'':'s')}
+function gearRow(kind,x,title,bits,current){
+  const m=bits.filter(Boolean).join(' · ');
+  return `<button class="gear ${current?'cur':''}" data-${kind}="${esc(x.id)}"><span class="gt2">${esc(title)}</span>${m?`<span class="gm2">${esc(m)}</span>`:''}</button>`;
+}
+function gearBlock(o){
+  if(!o.cur&&!o.past.length)return `<div class="gearempty"><span>${o.empty}</span><button class="btn ghost sm" data-act="${o.add}">${o.addLabel}</button></div>`;
+  const top=o.cur?o.curHtml:`<div class="gearempty"><span>None marked as current.</span></div>`;
+  return top+`<div class="row gearbar">${o.past.length?`<button class="linkbtn" data-act="${o.toggle}">${o.open?'Hide':'Show'} ${o.past.length} previous ${o.past.length===1?o.noun:o.nouns}</button>`:'<span></span>'}<button class="btn ghost sm" data-act="${o.add}">${o.addLabel}</button></div>`
+    +(o.open?o.past.map(o.rowHtml).join(''):'');
+}
 function boardCard(b){
   const spec=[['Size',b.size],['Dimensions',b.dims],['Wheelbase',b.wheelbase]].filter(x=>x[1]);
   return `<button class="bcard" data-board="${esc(b.id)}"><span class="lbl">Riding now</span><span class="bt">${esc(boardTitle(b))}</span>
