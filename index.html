@@ -114,6 +114,9 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .trick .t{flex:1;min-width:0}
 .trick .tn{font-weight:700;font-size:17px;overflow-wrap:anywhere}
 .trick .tm{font-size:14px;color:var(--muted);overflow-wrap:anywhere}
+.goalrow{display:flex;align-items:flex-start;gap:12px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer}
+.goalrow input{width:24px;height:24px;margin:0;flex:none;accent-color:var(--rider)}
+.goalrow>span{display:flex;flex-direction:column;gap:2px}
 .gbox{flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:var(--label);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);cursor:pointer}
 .gbox input{width:22px;height:22px;margin:0;accent-color:var(--rider);cursor:pointer}
 .trick .go{flex:none;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 10px;font-family:var(--label);font-weight:700;font-size:14px;white-space:nowrap}
@@ -651,6 +654,7 @@ function editTrick(id){
   let st=t.status,confirmDel=false,where=null;
   openSheet(`<h2>${esc(fullName(t))}</h2>
     <div class="field"><span class="lbl">Where it's at</span><div class="seg" id="st">${STATUSES.map(s=>`<button data-s="${s.k}">${s.label}</button>`).join('')}</div></div>
+    <label class="goalrow"><input type="checkbox" id="tgoal" ${goalFor(t.id)?'checked':''}><span><b>Make this a goal</b><span class="note">Shows in Goals and ticks itself off when it's landed.</span></span></label>
     <div class="field"><label class="lbl" for="tname">Name</label><input id="tname" value="${esc(fullName(t))}"></div>
     <div class="field"><label class="lbl" for="tcat">Type</label><select id="tcat">${CAT_NAMES.map(c=>`<option ${c===t.cat?'selected':''}>${esc(c)}</option>`).join('')}<option value="" ${t.cat&&!CAT_NAMES.includes(t.cat)?'':(!t.cat?'selected':'')}>Other</option></select></div>
     <div id="twhere"></div>
@@ -666,7 +670,11 @@ function editTrick(id){
       const w=where.get();if(!w.locId||!w.obstacle){toast('Pick a location and an obstacle');s.querySelector('#twhere').scrollIntoView({block:'center'});return}
       const {id:_,spots:_s,locIds:_l,...rest}=t;
       store.put('tricks',t.id,{...rest,name:s.querySelector('#tname').value.trim()||fullName(t),cat:s.querySelector('#tcat').value,stance:'',locId:w.locId,obstacle:w.obstacle,status:st,landedAt:s.querySelector('#tland').value||'',notes:s.querySelector('#tnotes').value.trim(),updated:Date.now()});
-      syncTrickGoal(t.id,st,s.querySelector('#tland').value);
+      const wantGoal=s.querySelector('#tgoal').checked,g=goalFor(t.id),land=s.querySelector('#tland').value;
+      if(wantGoal&&!g){const done=SIDX[st]>=2;const nt={...t,name:s.querySelector('#tname').value.trim()||fullName(t),stance:'',locId:w.locId,obstacle:w.obstacle};
+        store.put('goals',uid(),{rider:t.rider,trickId:t.id,text:goalText(nt),done,doneAt:done?(land||today()):'',due:'',created:Date.now()});toast('Added to goals')}
+      else if(!wantGoal&&g){store.del('goals',g.id);toast('Removed from goals')}
+      else syncTrickGoal(t.id,st,land);
       closeSheet();
     };
     s.querySelector('#del').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('tricks',t.id);closeSheet();toast('Trick deleted')};
