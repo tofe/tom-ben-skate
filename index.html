@@ -176,6 +176,19 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .runrow .tn{font-weight:700;font-size:17px;overflow-wrap:anywhere}
 .runrow .tm{font-size:14px;color:var(--muted)}
 .runrow .score{flex:none;font-family:var(--label);font-size:16px;color:var(--muted);font-variant-numeric:tabular-nums}
+.runrow .score{display:flex;flex-direction:column;align-items:flex-end}
+.runrow .score .best{font-size:13px;color:var(--muted)}
+.stat small{font-family:var(--label);font-size:16px;color:var(--muted)}
+.rgwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.rgt{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.rgt th,.rgt td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap}
+.rgt tr:last-child>*{border-bottom:0}
+.rgt thead th{font-family:var(--label);font-size:13px;color:var(--muted);font-weight:700}
+.rgt thead th small,.rgt tbody th small{display:block;font-weight:500;font-size:11px;color:var(--muted)}
+.rgt tbody th{text-align:left;font-weight:700;white-space:normal;min-width:120px;position:sticky;left:0;background:var(--bg)}
+.rgt .cell{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:6px;font-weight:800;font-size:13px;color:var(--muted)}
+.rgt .cell.land{background:var(--locked);color:#fff}.rgt .cell.miss{background:var(--miss);color:#fff}
+.rgt .pct{font-family:var(--label);font-weight:700}
 .runrow .score b{font-family:var(--display);font-weight:400;font-size:26px;color:var(--ink)}
 .marks{display:flex;flex-wrap:wrap;gap:3px}
 .marks i{width:12px;height:12px;border-radius:3px;background:var(--line)}
@@ -500,8 +513,9 @@ function render(){
   }
 
   const runs=state.runs.filter(r=>r.rider===R).sort((a,b)=>String(b.at).localeCompare(String(a.at)));
-  $('#runCount').textContent=runs.length?`${runs.length} run${runs.length===1?'':'s'}`:'';
-  $('#runs').innerHTML=runs.length?runs.map(runRow).join('')+`<button class="btn ghost" data-act="new-run" style="width:100%">+ New run</button>`:`<div class="empty">No runs yet for ${name}.<br>Build a run from their tricks, then tick each one landed or missed.<br><button class="btn" data-act="new-run">Start a run</button></div>`;
+  const groups=runGroups(R);
+  $('#runCount').textContent=groups.length?`${groups.length} run${groups.length===1?'':'s'} · ${runs.length} tr${runs.length===1?'y':'ies'}`:'';
+  $('#runs').innerHTML=runs.length?groups.map(runGroupRow).join('')+`<button class="btn ghost" data-act="new-run" style="width:100%">+ New run</button>`:`<div class="empty">No runs yet for ${name}.<br>Build a run from their tricks, then tick each one landed or missed.<br><button class="btn" data-act="new-run">Start a run</button></div>`;
 
   $('#goalCount').textContent=goals.length?`${gDone} of ${goals.length} done`:'';
   const gs=goals.slice().sort((a,b)=>(a.done-b.done)||((a.due||'9')<(b.due||'9')?-1:1));
@@ -816,6 +830,7 @@ document.addEventListener('click',e=>{
   if(b.dataset.act==='add-goal'){goalSheet();return}
   if(b.dataset.act==='new-run'){newRun();return}
   if(b.dataset.run){runSheet(b.dataset.run);return}
+  if(b.dataset.rg){runGroupSheet(b.dataset.rg);return}
   if(b.dataset.act==='add-board'){boardSheet();return}
   if(b.dataset.act==='add-shoe'){shoeSheet();return}
   if(b.dataset.shoe){shoeSheet(b.dataset.shoe);return}
@@ -965,6 +980,46 @@ document.getElementById('newLoc').addEventListener('keydown',e=>{if(e.key==='Ent
 function nowLocal(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`}
 const fmtDT=at=>{if(!at)return'';const d=new Date(at);return isNaN(d)?'':d.toLocaleString(undefined,{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})};
 function runScore(r){const it=r.items||[];return{land:it.filter(i=>i.res==='land').length,miss:it.filter(i=>i.res==='miss').length,total:it.length}}
+function runSig(r){const it=r.items||[];return it.length?(r.locId||'')+'|'+it.map(i=>(i.tid||i.name)+'~'+(i.obstacle||'')).join(','):'solo:'+r.id}
+function runGroups(rider){
+  const m=new Map();
+  state.runs.filter(r=>r.rider===rider).sort((a,b)=>String(b.at).localeCompare(String(a.at))).forEach(r=>{const k=runSig(r);if(!m.has(k))m.set(k,[]);m.get(k).push(r)});
+  return [...m.values()];
+}
+function groupOf(id){const r=state.runs.find(x=>x.id===id);if(!r)return[];const k=runSig(r);return state.runs.filter(x=>x.rider===r.rider&&runSig(x)===k).sort((a,b)=>String(b.at).localeCompare(String(a.at)))}
+function runGroupRow(tries){
+  const r=tries[0];if(tries.length===1)return runRow(r);
+  const loc=locName(r.locId);const sc=runScore(r);
+  const best=Math.max(...tries.map(t=>runScore(t).land));
+  const meta=[`${tries.length} tries`,'last '+fmtDT(r.at),loc].filter(Boolean).join(' · ');
+  return `<button class="runrow" data-rg="${esc(r.id)}"><span class="t"><span class="tn">${esc(r.name||'Run')}</span><span class="tm">${esc(meta)}</span>${sc.total?`<span class="marks" aria-hidden="true">${(r.items||[]).map(i=>`<i class="${esc(i.res||'')}"></i>`).join('')}</span>`:''}</span><span class="score" aria-label="Latest ${sc.land} of ${sc.total} landed, best ${best}"><b>${sc.land}</b>/${sc.total}<small class="best">best ${best}</small></span></button>`;
+}
+function newTryFrom(r,back){
+  const nid=uid();const nd={rider:r.rider,name:r.name,locId:r.locId||'',at:nowLocal(),items:(r.items||[]).map(i=>({tid:i.tid,name:i.name,res:'',obstacle:i.obstacle||''})),created:Date.now(),updated:Date.now()};
+  store.put('runs',nid,nd);runSheet(nid,nd,back);toast('New try started');
+}
+function runGroupSheet(id){
+  const tries=groupOf(id);if(!tries.length)return;
+  if(tries.length===1){runSheet(tries[0].id);return}
+  const latest=tries[0],items=latest.items||[],chron=tries.slice().reverse();
+  const back=()=>{const g=groupOf(latest.id);runGroupSheet(g.length?g[0].id:latest.id)};
+  const stats=items.map((it,i)=>{const res=chron.map(t=>(t.items||[])[i]?.res||'');const land=res.filter(x=>x==='land').length,tried=res.filter(Boolean).length;return {it,res,land,tried}});
+  const tot=tries.map(runScore),best=Math.max(...tot.map(x=>x.land)),avg=tot.reduce((a,x)=>a+x.land,0)/tries.length;
+  const dShort=at=>{const d=new Date(at);return isNaN(d)?'':d.toLocaleDateString(undefined,{day:'numeric',month:'short'})};
+  openSheet(`<h2>${esc(latest.name||'Run')}</h2>
+    <p class="note" style="margin:0">${[locName(latest.locId),`${tries.length} tries`,`${items.length} tricks`].filter(Boolean).map(esc).join(' · ')}</p>
+    <div class="strip"><div class="stat"><span class="lbl">Best</span><b>${best}<small>/${items.length}</small></b></div><div class="stat"><span class="lbl">Average</span><b>${avg.toFixed(1)}</b></div><div class="stat"><span class="lbl">Latest</span><b>${tot[0].land}<small>/${items.length}</small></b></div></div>
+    <span class="lbl">Each trick across every try</span>
+    <div class="rgwrap"><table class="rgt"><thead><tr><th scope="col">Trick</th>${chron.map((t,j)=>`<th scope="col" title="${esc(fmtDT(t.at))}">${j+1}<small>${esc(dShort(t.at))}</small></th>`).join('')}<th scope="col">Landed</th></tr></thead>
+      <tbody>${stats.map(({it,res,land,tried})=>`<tr><th scope="row">${esc(it.name)}${it.obstacle?`<small>${esc(it.obstacle)}</small>`:''}</th>${res.map(x=>`<td><span class="cell ${x}" aria-label="${x==='land'?'Landed':x==='miss'?'Missed':'Not tried'}">${x==='land'?'✓':x==='miss'?'✕':'·'}</span></td>`).join('')}<td class="pct">${land}/${tried||0}</td></tr>`).join('')}</tbody></table></div>
+    <span class="lbl">Tries</span>
+    <div class="group">${tries.map((t,j)=>{const sc=runScore(t);return `<button class="ltr" data-try="${esc(t.id)}"><span class="n">Try ${tries.length-j}<span class="m">${esc(fmtDT(t.at))}</span><span class="marks" aria-hidden="true">${(t.items||[]).map(i=>`<i class="${esc(i.res||'')}"></i>`).join('')}</span></span><span class="lbl" style="color:var(--ink)">${sc.land}/${sc.total}</span></button>`}).join('')}</div>
+    <div class="row"><button class="btn" id="gnew">Start a new try</button><button class="btn ghost" id="gclose">Close</button></div>`,s=>{
+    s.querySelector('#gclose').onclick=closeSheet;
+    s.querySelector('#gnew').onclick=()=>newTryFrom(latest,back);
+    s.addEventListener('click',e=>{const b=e.target.closest('[data-try]');if(b)runSheet(b.dataset.try,null,back)});
+  });
+}
 function runRow(r){
   const sc=runScore(r);const loc=r.locId&&state.locations.find(l=>l.id===r.locId);
   const meta=[fmtDT(r.at),loc?loc.name:''].filter(Boolean).join(' · ');
@@ -973,10 +1028,10 @@ function runRow(r){
 function newRun(){
   const prev=state.runs.filter(r=>r.rider===ui.rider).sort((a,b)=>String(b.at).localeCompare(String(a.at)));
   const id=uid();
-  const data={rider:ui.rider,name:'Run '+(prev.length+1),locId:prev[0]?.locId||'',at:nowLocal(),items:[],created:Date.now(),updated:Date.now()};
+  const data={rider:ui.rider,name:'Run '+(runGroups(ui.rider).length+1),locId:prev[0]?.locId||'',at:nowLocal(),items:[],created:Date.now(),updated:Date.now()};
   store.put('runs',id,data);runSheet(id,data);
 }
-function runSheet(id,initial){
+function runSheet(id,initial,back){
   const src=initial||state.runs.find(r=>r.id===id);if(!src)return;
   const d=JSON.parse(JSON.stringify(src));delete d.id;d.items=d.items||[];
   let confirmDel=false,timer=null,chain=Promise.resolve();
@@ -1018,8 +1073,8 @@ function runSheet(id,initial){
     s.querySelector('#rname').addEventListener('input',e=>{d.name=e.target.value;save()});
     s.querySelector('#rat').addEventListener('change',e=>{d.at=e.target.value;save()});
     s.querySelector('#rloc').addEventListener('change',e=>{d.locId=e.target.value;const ok=obstaclesOf(d.locId);d.items.forEach(it=>{if(it.obstacle&&!ok.includes(it.obstacle))it.obstacle=''});draw();save()});
-    s.querySelector('#rdone').onclick=closeSheet;
-    s.querySelector('#ragain').onclick=()=>{if(timer)flush();const nid=uid();const nd={...JSON.parse(JSON.stringify(d)),at:nowLocal(),items:d.items.map(i=>({tid:i.tid,name:i.name,res:'',obstacle:i.obstacle||''})),created:Date.now(),updated:Date.now()};sheetOnClose=null;chain.then(()=>store.put('runs',nid,nd));runSheet(nid,nd);toast('New attempt started')};
+    s.querySelector('#rdone').onclick=()=>{closeSheet();if(back)back()};
+    s.querySelector('#ragain').onclick=()=>{if(timer)flush();const nid=uid();const nd={...JSON.parse(JSON.stringify(d)),at:nowLocal(),items:d.items.map(i=>({tid:i.tid,name:i.name,res:'',obstacle:i.obstacle||''})),created:Date.now(),updated:Date.now()};sheetOnClose=null;chain.then(()=>store.put('runs',nid,nd));runSheet(nid,nd,back||(()=>runGroupSheet(nid)));toast('New try started')};
     s.querySelector('#rdel').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}clearTimeout(timer);timer=null;sheetOnClose=null;chain.then(()=>store.del('runs',id));closeSheet();toast('Run deleted')};
   });
   sheetOnClose=()=>{if(timer)flush()};
