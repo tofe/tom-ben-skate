@@ -248,6 +248,13 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
   </section>
 
   <section>
+    <div class="sh"><h2>Locations</h2><span class="lbl" id="locCount"></span></div>
+    <div class="field"><label class="lbl" for="newLoc">Add a skatepark or spot</label>
+      <div class="row"><input id="newLoc" placeholder="e.g. Local skatepark, school stairs" autocomplete="off" style="flex:1"><button class="btn" id="addLoc" style="flex:none">Add</button></div></div>
+    <div id="locs" class="group"></div>
+  </section>
+
+  <section>
     <div class="sh" style="align-items:center"><h2>Tricks</h2><span class="lbl" id="trickCount"></span></div>
     <div class="filters" id="filters"></div>
     <div id="tricks"></div>
@@ -258,13 +265,6 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
     <div id="runs" class="group"></div>
   </section>
 
-
-  <section>
-    <div class="sh"><h2>Locations</h2><span class="lbl" id="locCount"></span></div>
-    <div class="field"><label class="lbl" for="newLoc">Add a skatepark or spot</label>
-      <div class="row"><input id="newLoc" placeholder="e.g. Local skatepark, school stairs" autocomplete="off" style="flex:1"><button class="btn" id="addLoc" style="flex:none">Add</button></div></div>
-    <div id="locs" class="group"></div>
-  </section>
 
   <section>
     <div class="sh"><h2>Decks</h2><span class="lbl" id="boardCount"></span></div>
