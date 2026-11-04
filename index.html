@@ -270,6 +270,7 @@ const STAIR_TRICKS=[...GAP_TRICKS,'50-50 handrail','Boardslide handrail','Lipsli
 CATS['Death Gap']=GAP_TRICKS;
 ['2 Stair','3 Stair','5 Stair','6 Stair','7 Stair','Street Stairs'].forEach(k=>CATS[k]=STAIR_TRICKS);
 const CAT_NAMES=Object.keys(CATS);
+const locIdsOf=t=>Array.isArray(t.locIds)?t.locIds:(t.locId?[t.locId]:[]);
 const fullName=t=>t.stance&&t.stance!=='Regular'&&!t.name.toLowerCase().startsWith(t.stance.toLowerCase())?t.stance+' '+t.name.charAt(0).toLowerCase()+t.name.slice(1):t.name;
 
 let state={riders:{a:{name:'Skater 1'},b:{name:'Skater 2'}},tricks:[],goals:[],locations:[],runs:[]};
@@ -432,14 +433,14 @@ function render(){
 
   const locs=sortedLocs();
   $('#locCount').textContent=locs.length?`${locs.length} spot${locs.length===1?'':'s'}`:'';
-  $('#locs').innerHTML=locs.length?locs.map(l=>{const nt=state.tricks.filter(t=>t.locId===l.id).length,nr=state.runs.filter(r=>r.locId===l.id).length;const armed=pendingLocDel===l.id;return `<div class="loc"><button class="ln locopen" data-loc="${esc(l.id)}">${esc(l.name)}<span class="lc">${nt} trick${nt===1?'':'s'} · ${nr} run${nr===1?'':'s'} ›</span></button><button class="x ${armed?'armed':''}" data-ldel="${esc(l.id)}">${armed?'Tap to delete':'Delete'}</button></div>`}).join(''):`<div class="empty">No locations yet. Add a park or spot above, then pick it on any trick or run.</div>`;
+  $('#locs').innerHTML=locs.length?locs.map(l=>{const nt=state.tricks.filter(t=>locIdsOf(t).includes(l.id)).length,nr=state.runs.filter(r=>r.locId===l.id).length;const armed=pendingLocDel===l.id;return `<div class="loc"><button class="ln locopen" data-loc="${esc(l.id)}">${esc(l.name)}<span class="lc">${nt} trick${nt===1?'':'s'} · ${nr} run${nr===1?'':'s'} ›</span></button><button class="x ${armed?'armed':''}" data-ldel="${esc(l.id)}">${armed?'Tap to delete':'Delete'}</button></div>`}).join(''):`<div class="empty">No locations yet. Add a park or spot above, then pick it on any trick or run.</div>`;
 
   $('#footnote').textContent=store.mode==='db'?'Synced through your family login, so it matches on every phone and laptop. Tap the selected skater for names, photos, backups and sign out.':'';
 }
 function trickRow(t){
   const i=SIDX[t.status]??0;
-  const loc=t.locId&&state.locations.find(l=>l.id===t.locId);
-  const meta=[t.cat||'',loc?'at '+loc.name:'',t.landedAt?'First landed '+fmtDate(t.landedAt):''].filter(Boolean).join(' · ');
+  const lnames=locIdsOf(t).map(id=>state.locations.find(l=>l.id===id)?.name).filter(Boolean);
+  const meta=[t.cat||'',lnames.length?'at '+lnames.join(', '):'',t.landedAt?'First landed '+fmtDate(t.landedAt):''].filter(Boolean).join(' · ');
   const next=STATUSES[i+1];
   return `<div class="trick">
     <span class="pips" data-s="${esc(t.status)}" aria-label="${STATUSES[i].label}">${[0,1,2,3].map(n=>`<i class="${n<=i?'on':''}"></i>`).join('')}</span>
@@ -520,22 +521,23 @@ function addTrick(name,cat){
 
 function editTrick(id){
   const t=state.tricks.find(x=>x.id===id);if(!t)return;
-  let st=t.status,confirmDel=false;
+  let st=t.status,confirmDel=false;const locSel=new Set(locIdsOf(t));
   openSheet(`<h2>${esc(fullName(t))}</h2>
     <div class="field"><span class="lbl">Where it's at</span><div class="seg" id="st">${STATUSES.map(s=>`<button data-s="${s.k}">${s.label}</button>`).join('')}</div></div>
     <div class="field"><label class="lbl" for="tname">Name</label><input id="tname" value="${esc(fullName(t))}"></div>
     <div class="field"><label class="lbl" for="tcat">Type</label><select id="tcat">${CAT_NAMES.map(c=>`<option ${c===t.cat?'selected':''}>${esc(c)}</option>`).join('')}<option value="" ${t.cat&&!CAT_NAMES.includes(t.cat)?'':(!t.cat?'selected':'')}>Other</option></select></div>
-    <div class="field"><label class="lbl" for="tloc">Location</label><select id="tloc"><option value="">No location</option>${sortedLocs().map(l=>`<option value="${esc(l.id)}" ${l.id===t.locId?'selected':''}>${esc(l.name)}</option>`).join('')}</select>${state.locations.length?'':'<span class="note">Add spots in the Locations section to pick one here.</span>'}</div>
+    <div class="field"><span class="lbl" id="tlocL">Locations</span><div class="filters" id="tloc" role="group" aria-labelledby="tlocL" style="flex-wrap:wrap">${sortedLocs().map(l=>`<button class="chip" data-l="${esc(l.id)}" aria-pressed="${locIdsOf(t).includes(l.id)}">${esc(l.name)}</button>`).join('')}</div>${state.locations.length?'<span class="note">Tap every spot where this trick has been done.</span>':'<span class="note">Add spots in the Locations section to pick them here.</span>'}</div>
     <div class="field"><label class="lbl" for="tland">First landed</label><input id="tland" type="date" value="${esc(t.landedAt||'')}"></div>
     <div class="field"><label class="lbl" for="tnotes">Notes</label><textarea id="tnotes" placeholder="Where, how it felt, what to fix next">${esc(t.notes||'')}</textarea></div>
     <div class="row"><button class="btn" id="save">Save</button><button class="btn ghost" id="cancel">Cancel</button></div>
     <button class="btn danger" id="del">Delete trick</button>`,s=>{
     const mark=()=>{s.querySelectorAll('#st button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.s===st))};mark();
     s.querySelector('#st').onclick=e=>{const b=e.target.closest('[data-s]');if(b){st=b.dataset.s;if(SIDX[st]>=2&&!s.querySelector('#tland').value)s.querySelector('#tland').value=today();mark()}};
+    s.querySelector('#tloc').onclick=e=>{const b=e.target.closest('[data-l]');if(!b)return;const id=b.dataset.l;locSel.has(id)?locSel.delete(id):locSel.add(id);b.setAttribute('aria-pressed',locSel.has(id))};
     s.querySelector('#cancel').onclick=closeSheet;
     s.querySelector('#save').onclick=()=>{
       const {id:_,...rest}=t;
-      store.put('tricks',t.id,{...rest,name:s.querySelector('#tname').value.trim()||fullName(t),cat:s.querySelector('#tcat').value,stance:'',locId:s.querySelector('#tloc').value,status:st,landedAt:s.querySelector('#tland').value||'',notes:s.querySelector('#tnotes').value.trim(),updated:Date.now()});
+      store.put('tricks',t.id,{...rest,name:s.querySelector('#tname').value.trim()||fullName(t),cat:s.querySelector('#tcat').value,stance:'',locId:'',locIds:[...locSel],status:st,landedAt:s.querySelector('#tland').value||'',notes:s.querySelector('#tnotes').value.trim(),updated:Date.now()});
       closeSheet();
     };
     s.querySelector('#del').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('tricks',t.id);closeSheet();toast('Trick deleted')};
@@ -636,7 +638,7 @@ document.getElementById('riders').addEventListener('dblclick',namesSheet);
 
 function locSheet(id){
   const l=state.locations.find(x=>x.id===id);if(!l)return;
-  const tricks=state.tricks.filter(t=>t.locId===id),runs=state.runs.filter(r=>r.locId===id);
+  const tricks=state.tricks.filter(t=>locIdsOf(t).includes(id)),runs=state.runs.filter(r=>r.locId===id);
   const order={locked:0,landed:1,working:2,wish:3};
   const part=k=>{
     const ts=tricks.filter(t=>t.rider===k).sort((a,b)=>(order[a.status]??9)-(order[b.status]??9)||fullName(a).localeCompare(fullName(b)));
