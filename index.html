@@ -493,7 +493,7 @@ function startSync(){
   const fail=e=>{clearTimeout(timer);$('#sync').textContent=e&&e.code==='permission-denied'?'This login has no access':'Sync stopped. Reload to retry'};
   const rows=s=>s.docs.map(d=>({...d.data(),id:d.id}));
   subs.push(db.doc('app/riders').onSnapshot(M,s=>{if(s.exists){const d=s.data();state.riders={a:{name:d.a?.name||'Skater 1',photo:d.a?.photo||''},b:{name:d.b?.name||'Skater 2',photo:d.b?.photo||''}};render()}},fail));
-  subs.push(db.collection('tricks').onSnapshot(M,s=>{state.tricks=rows(s);if(!s.metadata.fromCache){firstT=true;convertSpots()}done();render()},fail));
+  subs.push(db.collection('tricks').onSnapshot(M,s=>{state.tricks=rows(s);if(!s.metadata.fromCache){firstT=true;firstTricks=true;convertSpots();promoteFromRuns()}done();render()},fail));
   subs.push(db.collection('goals').onSnapshot(M,s=>{state.goals=rows(s);if(!s.metadata.fromCache)firstG=true;done();render()},fail));
   subs.push(db.doc('app/background').onSnapshot(s=>{state.bg=s.exists?(s.data().photo||''):'';applyBg()},fail));
   subs.push(db.collection('locations').onSnapshot(s=>{state.locations=rows(s);render()},fail));
@@ -645,6 +645,19 @@ function toggleTrickGoal(tid,on){
   const t=state.tricks.find(x=>x.id===tid);if(!t)return;const g=goalFor(tid);
   if(on&&!g){const done=SIDX[t.status]>=2;store.put('goals',uid(),{rider:t.rider,trickId:t.id,text:goalText(t),done,doneAt:done?(t.landedAt||today()):'',due:'',created:Date.now()});toast('Added to goals')}
   else if(!on&&g){store.del('goals',g.id);toast('Removed from goals')}
+}
+function promoteTrick(tid,at){
+  // a trick landed in a run is at least "Landed" on the trick list
+  const t=tid&&state.tricks.find(x=>x.id===tid);if(!t||SIDX[t.status]>=2)return false;
+  const day=String(at||'').slice(0,10)||today();const {id,...r}=t;
+  const row={...r,status:'landed',landedAt:t.landedAt||day,updated:Date.now()};
+  t.status='landed';t.landedAt=row.landedAt;store.put('tricks',id,row);syncTrickGoal(id,'landed',row.landedAt);return true;
+}
+let promotedAll=false;
+function promoteFromRuns(){
+  if(promotedAll||!store.db||!runsReady||!firstTricks)return;promotedAll=true;
+  const first={};state.runs.slice().sort((a,b)=>String(a.at).localeCompare(String(b.at))).forEach(r=>(r.items||[]).forEach(i=>{if(i.res==='land'&&i.tid&&!first[i.tid])first[i.tid]=r.at}));
+  Object.entries(first).forEach(([tid,at])=>promoteTrick(tid,at));
 }
 function syncTrickGoal(tid,status,landedAt){
   const g=goalFor(tid);if(!g)return;const done=SIDX[status]>=2;
@@ -1122,7 +1135,8 @@ function runGroups(rider){
 }
 function groupOf(id){const r=state.runs.find(x=>x.id===id);if(!r)return[];const k=groupKey(r);return state.runs.filter(x=>x.rider===r.rider&&groupKey(x)===k).sort((a,b)=>String(b.at).localeCompare(String(a.at)))}
 let runsReady=false,defsReady=false,migratedRuns=false;
-function migrateRuns(){
+let firstTricks=false;
+function migrateRuns(){promoteFromRuns();
   // older tries had no run definition: give each set of matching tries a shared one (same id on every device)
   if(migratedRuns||!store.db||!runsReady||!defsReady)return;migratedRuns=true;
   const m=new Map();
@@ -1359,7 +1373,7 @@ function runSheet(id,initial,back){
       if(b.dataset.rm!==undefined){d.items.splice(+b.dataset.rm,1);draw();saveS();return}
       if(b.dataset.mv!==undefined){const i=+b.dataset.mv,j=i+(+b.dataset.d);if(j<0||j>=d.items.length)return;[d.items[i],d.items[j]]=[d.items[j],d.items[i]];draw();saveS();
         const nb=s.querySelector(`[data-mv="${j}"][data-d="${b.dataset.d}"]`)||s.querySelector(`[data-mv="${j}"]`);nb&&!nb.disabled&&nb.focus();return}
-      const it=d.items[+b.dataset.i];if(!it)return;it.res=it.res===b.dataset.v?'':b.dataset.v;draw();save()};
+      const it=d.items[+b.dataset.i];if(!it)return;it.res=it.res===b.dataset.v?'':b.dataset.v;draw();save();if(it.res==='land'&&promoteTrick(it.tid,d.at))toast(`${it.name} moved to Landed`)};
     s.querySelector('#raddBtn').onclick=()=>{const t=state.tricks.find(x=>x.id===s.querySelector('#radd').value);if(!t)return;
       d.items.push({tid:t.id,name:fullName(t),res:'',obstacle:t.locId===d.locId&&t.obstacle?t.obstacle:''});draw();saveS()};
     s.querySelector('#ritems').addEventListener('change',e=>{const el=e.target.closest('select.robs');if(!el)return;const it=d.items[+el.dataset.oi];if(it){it.obstacle=el.value;saveS()}});
