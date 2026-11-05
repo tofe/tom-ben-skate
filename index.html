@@ -1365,8 +1365,8 @@ function runSheet(id,initial,back){
     s.querySelector('#rat').addEventListener('change',e=>{d.at=e.target.value;save()});
     s.querySelector('#rloc').addEventListener('change',e=>{d.locId=e.target.value;const ok=obstaclesOf(d.locId);d.items.forEach(it=>{if(it.obstacle&&!ok.includes(it.obstacle))it.obstacle=''});draw();saveS()});
     s.querySelector('#rdone').onclick=()=>{closeSheet();if(back)back()};
-    s.querySelector('#ragain').onclick=()=>{if(timer)flush();const def=d.defId&&state.runDefs.find(x=>x.id===d.defId);const srcItems=structChanged||!def?d.items:def.items;
-      const nid=uid();const nd={...JSON.parse(JSON.stringify(d)),name:def&&!structChanged?def.name:d.name,locId:def&&!structChanged?(def.locId||''):d.locId,at:nowLocal(),compScore:'',items:(srcItems||[]).map(i=>({tid:i.tid,name:i.name,res:'',obstacle:i.obstacle||''})),created:Date.now(),updated:Date.now()};
+    s.querySelector('#ragain').onclick=()=>{if(timer)flush();const def=d.defId&&state.runDefs.find(x=>x.id===d.defId);const srcItems=d.items;
+      const nid=uid();const nd={...JSON.parse(JSON.stringify(d)),name:d.name,locId:d.locId,at:nowLocal(),compScore:'',items:(srcItems||[]).map(i=>({tid:i.tid,name:i.name,res:'',obstacle:i.obstacle||''})),created:Date.now(),updated:Date.now()};
       if(!nd.compId)delete nd.compScore;
       sheetOnClose=null;chain.then(()=>store.put('runs',nid,nd));runSheet(nid,nd,back||(()=>runGroupSheet(nid)));
       toast(comp?`Run ${state.runs.filter(x=>x.compId===d.compId&&x.roundId===d.roundId&&x.rider===d.rider).length+1} added to ${round?round.name:comp.name}`:'New try started')};
