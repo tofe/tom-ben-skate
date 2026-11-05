@@ -1281,11 +1281,12 @@ function compSheet(id,isNew){
 }
 function compRunPicker(compId,roundId,rider,locId){
   const c=state.comps.find(x=>x.id===compId);const rd=c&&(c.rounds||[]).find(x=>x.id===roundId);
-  const groups=runGroups(rider);const who=esc(state.riders[rider]?.name||'Skater');
+  const inComp=new Set(state.runs.filter(r=>r.compId===compId&&r.rider===rider).map(groupKey));
+  const groups=runGroups(rider).sort((a,b)=>(inComp.has(groupKey(b[0]))-inComp.has(groupKey(a[0]))));const who=esc(state.riders[rider]?.name||'Skater');
   const back=()=>compSheet(compId);
   openSheet(`<h2>Add a run for ${who}</h2>
     <p class="note" style="margin:0">${esc(c?.name||'')}${rd?' · '+esc(rd.name):''}. Pick one of ${who}'s runs to start a new try, or build a new one. It also shows in Runs.</p>
-    <div class="group">${groups.length?groups.map(g=>{const r=g[0],def=defOf(r);const items=(def?def.items:r.items)||[];return `<button class="ltr" data-pick="${esc(r.id)}"><span class="n">${esc(def?.name||r.name||'Run')}<span class="m">${esc([`${items.length} trick${items.length===1?'':'s'}`,locName(def?def.locId:r.locId),`${g.length} tr${g.length===1?'y':'ies'}`].filter(Boolean).join(' · '))}</span></span><span class="lbl">Use ›</span></button>`}).join(''):`<span class="note">${who} has no runs yet.</span>`}</div>
+    <div class="group">${groups.length?groups.map(g=>{const r=g[0],def=defOf(r);const items=(def?def.items:r.items)||[];return `<button class="ltr" data-pick="${esc(r.id)}"><span class="n">${esc(def?.name||r.name||'Run')}${inComp.has(groupKey(r))?' <span class="tag s-landed">Used in this comp</span>':''}<span class="m">${esc([`${items.length} trick${items.length===1?'':'s'}`,locName(def?def.locId:r.locId),`${g.length} tr${g.length===1?'y':'ies'}`].filter(Boolean).join(' · '))}</span></span><span class="lbl">Use ›</span></button>`}).join(''):`<span class="note">${who} has no runs yet.</span>`}</div>
     <button class="btn" id="pnew">Build a new run</button>
     <button class="btn ghost" id="pback">Back</button>`,s=>{
     s.querySelector('#pback').onclick=back;
@@ -1334,7 +1335,7 @@ function runSheet(id,initial,back){
     <div class="sh"><span class="lbl">Tricks in this run</span><span class="lbl" id="rscore"></span></div>
     <div id="ritems" class="group"></div>
     <div class="field"><label class="lbl" for="radd">Add a trick</label><div class="row"><select id="radd" style="flex:1;min-width:0"></select><button class="btn" id="raddBtn" style="flex:none">Add</button></div></div>
-    <div class="row"><button class="btn" id="rdone">Done</button><button class="btn ghost" id="ragain">Try this run again</button></div>
+    <div class="row"><button class="btn" id="rdone">Done</button><button class="btn ghost" id="ragain">${comp?'Next run in '+esc(round?round.name:comp.name):'Try this run again'}</button></div>
     <button class="btn danger" id="rdel">Delete this try</button>`,s=>{
     const draw=()=>{
       const sc=runScore(d);
@@ -1365,8 +1366,10 @@ function runSheet(id,initial,back){
     s.querySelector('#rloc').addEventListener('change',e=>{d.locId=e.target.value;const ok=obstaclesOf(d.locId);d.items.forEach(it=>{if(it.obstacle&&!ok.includes(it.obstacle))it.obstacle=''});draw();saveS()});
     s.querySelector('#rdone').onclick=()=>{closeSheet();if(back)back()};
     s.querySelector('#ragain').onclick=()=>{if(timer)flush();const def=d.defId&&state.runDefs.find(x=>x.id===d.defId);const srcItems=structChanged||!def?d.items:def.items;
-      const nid=uid();const nd={...JSON.parse(JSON.stringify(d)),name:def&&!structChanged?def.name:d.name,locId:def&&!structChanged?(def.locId||''):d.locId,at:nowLocal(),items:(srcItems||[]).map(i=>({tid:i.tid,name:i.name,res:'',obstacle:i.obstacle||''})),created:Date.now(),updated:Date.now()};
-      sheetOnClose=null;chain.then(()=>store.put('runs',nid,nd));runSheet(nid,nd,back||(()=>runGroupSheet(nid)));toast('New try started')};
+      const nid=uid();const nd={...JSON.parse(JSON.stringify(d)),name:def&&!structChanged?def.name:d.name,locId:def&&!structChanged?(def.locId||''):d.locId,at:nowLocal(),compScore:'',items:(srcItems||[]).map(i=>({tid:i.tid,name:i.name,res:'',obstacle:i.obstacle||''})),created:Date.now(),updated:Date.now()};
+      if(!nd.compId)delete nd.compScore;
+      sheetOnClose=null;chain.then(()=>store.put('runs',nid,nd));runSheet(nid,nd,back||(()=>runGroupSheet(nid)));
+      toast(comp?`Run ${state.runs.filter(x=>x.compId===d.compId&&x.roundId===d.roundId&&x.rider===d.rider).length+1} added to ${round?round.name:comp.name}`:'New try started')};
     s.querySelector('#rdel').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}clearTimeout(timer);timer=null;sheetOnClose=null;chain.then(()=>store.del('runs',id));closeSheet();toast('Try deleted');if(back)setTimeout(()=>{const g=state.runs.filter(x=>x.id!==id&&x.rider===d.rider&&groupKey(x)===groupKey(d));if(g.length)back()},300)};
   });
   sheetOnClose=()=>{if(timer)flush()};
