@@ -1284,15 +1284,18 @@ function compRunPicker(compId,roundId,rider,locId){
   const inComp=new Set(state.runs.filter(r=>r.compId===compId&&r.rider===rider).map(groupKey));
   const groups=runGroups(rider).sort((a,b)=>(inComp.has(groupKey(b[0]))-inComp.has(groupKey(a[0]))));const who=esc(state.riders[rider]?.name||'Skater');
   const back=()=>compSheet(compId);
+  // copy the tricks from the most recent time this run was skated (in this competition if it has been)
+  const srcOf=g=>g.filter(t=>t.compId===compId).sort((a,b)=>(b.created||0)-(a.created||0))[0]||g.slice().sort((a,b)=>String(b.at).localeCompare(String(a.at))||(b.created||0)-(a.created||0))[0];
+  const itemsOf=t=>{const it=t.items||[];if(it.length)return it;const def=defOf(t);return def?def.items||[]:[]};
   openSheet(`<h2>Add a run for ${who}</h2>
     <p class="note" style="margin:0">${esc(c?.name||'')}${rd?' · '+esc(rd.name):''}. Pick one of ${who}'s runs to start a new try, or build a new one. It also shows in Runs.</p>
-    <div class="group">${groups.length?groups.map(g=>{const r=g[0],def=defOf(r);const items=(def?def.items:r.items)||[];return `<button class="ltr" data-pick="${esc(r.id)}"><span class="n">${esc(def?.name||r.name||'Run')}${inComp.has(groupKey(r))?' <span class="tag s-landed">Used in this comp</span>':''}<span class="m">${esc([`${items.length} trick${items.length===1?'':'s'}`,locName(def?def.locId:r.locId),`${g.length} tr${g.length===1?'y':'ies'}`].filter(Boolean).join(' · '))}</span></span><span class="lbl">Use ›</span></button>`}).join(''):`<span class="note">${who} has no runs yet.</span>`}</div>
+    <div class="group">${groups.length?groups.map(g=>{const r=srcOf(g),def=defOf(r);const items=itemsOf(r);return `<button class="ltr" data-pick="${esc(r.id)}"><span class="n">${esc(def?.name||r.name||'Run')}${inComp.has(groupKey(r))?' <span class="tag s-landed">Used in this comp</span>':''}<span class="m">${esc([`${items.length} trick${items.length===1?'':'s'}`,locName(def?def.locId:r.locId),`${g.length} tr${g.length===1?'y':'ies'}`].filter(Boolean).join(' · '))}</span></span><span class="lbl">Use ›</span></button>`}).join(''):`<span class="note">${who} has no runs yet.</span>`}</div>
     <button class="btn" id="pnew">Build a new run</button>
     <button class="btn ghost" id="pback">Back</button>`,s=>{
     s.querySelector('#pback').onclick=back;
     s.addEventListener('click',e=>{const b=e.target.closest('[data-pick]');if(!b)return;
       const r=state.runs.find(x=>x.id===b.dataset.pick);if(!r)return;const def=defOf(r)||r;
-      const nid=uid();const nd={rider,defId:r.defId||'',name:def.name||r.name,locId:locId||def.locId||'',at:nowLocal(),compId,roundId,compScore:'',items:(def.items||[]).map(i=>({tid:i.tid,name:i.name,res:'',obstacle:i.obstacle||''})),created:Date.now(),updated:Date.now()};
+      const nid=uid();const nd={rider,defId:r.defId||'',name:r.name||def.name,locId:locId||r.locId||def.locId||'',at:nowLocal(),compId,roundId,compScore:'',items:itemsOf(r).map(i=>({tid:i.tid,name:i.name,res:'',obstacle:i.obstacle||''})),created:Date.now(),updated:Date.now()};
       store.put('runs',nid,nd);runSheet(nid,nd,back);toast('Run added to '+(rd?rd.name:'competition'))});
     s.querySelector('#pnew').onclick=()=>{
       const id=uid(),defId='def-'+id,name=(c?.name||'Comp')+' run',loc=locId||'';
@@ -1318,7 +1321,7 @@ function runSheet(id,initial,back){
   const src=initial||state.runs.find(r=>r.id===id);if(!src)return;
   const d=JSON.parse(JSON.stringify(src));delete d.id;d.items=d.items||[];
   let confirmDel=false,timer=null,chain=Promise.resolve(),structChanged=false;
-  const isLatest=()=>!state.runs.some(x=>x.id!==id&&x.rider===d.rider&&groupKey(x)===groupKey(d)&&String(x.at)>String(d.at));
+  const isLatest=()=>!state.runs.some(x=>x.id!==id&&x.rider===d.rider&&groupKey(x)===groupKey(d)&&(String(x.at)>String(d.at)||(String(x.at)===String(d.at)&&(x.created||0)>(d.created||0))));
   const flush=()=>{clearTimeout(timer);timer=null;d.updated=Date.now();const snap=JSON.parse(JSON.stringify(d));chain=chain.then(()=>store.put('runs',id,snap));
     if(structChanged&&d.defId&&isLatest()){const def=state.runDefs.find(x=>x.id===d.defId);const base=def?(({id:_,...r})=>r)(def):{rider:d.rider,created:Date.now()};
       store.put('runDefs',d.defId,{...base,name:d.name,locId:d.locId,items:stripItems(d.items),updated:Date.now()});structChanged=false}};
