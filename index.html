@@ -138,6 +138,9 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .goal{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
 .goal .chk{flex:none;width:28px;height:28px;border-radius:8px;border:2px solid var(--rider);background:transparent;display:grid;place-items:center;color:#fff;padding:0}
 .goal.done .chk{background:var(--rider)}
+.goal.inprog{border-left:5px solid var(--wax)}
+.gprog{flex:none;align-self:center;border:1px solid var(--line);border-radius:999px;padding:5px 10px;background:transparent;color:var(--muted);font-family:var(--label);font-weight:700;font-size:13px;letter-spacing:.03em;white-space:nowrap}
+.gprog.on{background:var(--wax);border-color:var(--wax);color:#2a2100}
 .goal .t{flex:1;min-width:0}
 .goal .gt{font-weight:600;font-size:16px;overflow-wrap:anywhere}
 .goal.done .gt{text-decoration:line-through;color:var(--muted)}
@@ -592,9 +595,10 @@ function render(){
   $('#comps').innerHTML=comps.length?comps.map(compRow).join('')+`<button class="btn ghost" data-act="add-comp" style="width:100%">+ Add a competition</button>`
     :`<div class="gearempty"><span>No competitions yet.</span><button class="btn ghost sm" data-act="add-comp">+ Add</button></div>`;
 
-  $('#goalCount').textContent=goals.length?`${gDone} of ${goals.length} done`:'';
+  const gProg=goals.filter(goalInProgress).length;
+  $('#goalCount').textContent=goals.length?`${gProg?gProg+' in progress · ':''}${gDone} of ${goals.length} done`:'';
   const ord=x=>typeof x.order==='number'?x.order:1e9;
-  const gs=goals.slice().sort((a,b)=>(a.done-b.done)||(ord(a)-ord(b))||((a.due||'9')<(b.due||'9')?-1:1));
+  const gs=goals.slice().sort((a,b)=>(a.done-b.done)||(goalInProgress(b)-goalInProgress(a))||(ord(a)-ord(b))||((a.due||'9')<(b.due||'9')?-1:1));
   $('#goals').innerHTML=gs.length?gs.map(goalRow).join('')+`<button class="btn ghost" data-act="add-goal" style="width:100%">+ Add a goal</button>`:`<div class="empty">No goals for ${name} yet.<br>Try “Land a kickflip by the holidays” or “Drop in on the big bowl”.<br><button class="btn" data-act="add-goal">Set a goal</button></div>`;
 
   const locs=sortedLocs();
@@ -667,9 +671,11 @@ function goalRow(g){
   let when='';
   if(g.done)when='Done '+fmtDate(g.doneAt);
   else if(g.due){const d=daysTo(g.due);when=d<0?`<span class="late">${-d} day${d===-1?'':'s'} past ${fmtDate(g.due)}</span>`:d===0?'Due today':`By ${fmtDate(g.due)} · ${d} day${d===1?'':'s'} left`}
-  return `<div class="goal ${g.done?'done':''}" ${g.done?'':`data-sortitem="goal" data-key="${esc(g.id)}"`}>
+  const ip=goalInProgress(g);
+  return `<div class="goal ${g.done?'done':''} ${ip?'inprog':''}" ${g.done?'':`data-sortitem="goal" data-key="${esc(g.id)}"`}>
     <button class="chk" data-done="${g.id}" aria-label="${g.done?'Mark not done':'Mark done'}">${g.done?'✓':''}</button>
     <div class="t"><div class="gt">${esc(goalLabel(g))}</div>${when?`<div class="gm">${when}</div>`:''}</div>
+    ${g.done?'':`<button class="gprog ${ip?'on':''}" data-gprog="${esc(g.id)}" aria-pressed="${ip}">In progress</button>`}
     <button class="x" data-gedit="${g.id}">Edit</button>${g.done?'':`<button class="handle" data-drag aria-label="Drag to move this goal">${GRIP}</button>`}
   </div>`;
 }
@@ -856,6 +862,19 @@ function goalSheet(id){
     if(g)s.querySelector('#del').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('goals',g.id);closeSheet();toast('Goal deleted')};
   });
 }
+function goalInProgress(g){
+  if(g.done)return false;
+  const t=g.trickId&&state.tricks.find(x=>x.id===g.trickId);
+  return t?t.status==='working':!!g.progress;
+}
+function toggleGoalProgress(id){
+  const g=state.goals.find(x=>x.id===id);if(!g||g.done)return;
+  const on=!goalInProgress(g);const {id:_,...r}=g;
+  store.put('goals',id,{...r,progress:on});
+  const t=g.trickId&&state.tricks.find(x=>x.id===g.trickId);
+  if(t&&SIDX[t.status]<2&&(t.status==='working')!==on){const {id:tid,...tr}=t;store.put('tricks',tid,{...tr,status:on?'working':'wish',updated:Date.now()})}
+  toast(on?'Marked in progress':'No longer in progress');
+}
 function toggleGoal(id){
   const g=state.goals.find(x=>x.id===id);if(!g)return;const {id:_,...r}=g;
   store.put('goals',id,{...r,done:!g.done,doneAt:!g.done?today():''});
@@ -922,6 +941,7 @@ document.addEventListener('click',e=>{
   if(b.dataset.up){levelUp(b.dataset.up);return}
   if(b.dataset.edit){editTrick(b.dataset.edit);return}
   if(b.dataset.done){toggleGoal(b.dataset.done);return}
+  if(b.dataset.gprog){toggleGoalProgress(b.dataset.gprog);return}
   if(b.dataset.gedit){goalSheet(b.dataset.gedit);return}
   if(b.dataset.act==='toggle-tricks'){ui.allTricks=!ui.allTricks;render();if(!ui.allTricks)document.getElementById('tricks').scrollIntoView({block:'nearest'});return}
   if(b.dataset.act==='add-trick'){trickSheet();return}
