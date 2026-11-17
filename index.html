@@ -139,6 +139,14 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .goal .chk{flex:none;width:28px;height:28px;border-radius:8px;border:2px solid var(--rider);background:transparent;display:grid;place-items:center;color:#fff;padding:0}
 .goal.done .chk{background:var(--rider)}
 .goal.inprog{border-left:5px solid var(--wax)}
+.goal.tinted{background:color-mix(in srgb,var(--gc) 18%,var(--surface));border-color:color-mix(in srgb,var(--gc) 55%,var(--line))}
+.goal.tinted .chk{border-color:color-mix(in srgb,var(--gc) 70%,var(--ink))}
+.goal.tinted.done .chk{background:color-mix(in srgb,var(--gc) 70%,var(--ink))}
+.goal.tinted.inprog{border-left-color:var(--wax)}
+.swatches{display:flex;flex-wrap:wrap;gap:10px}
+.sw{width:36px;height:36px;border-radius:50%;border:2px solid var(--line);background:var(--sw);padding:0;cursor:pointer}
+.sw.none{background:linear-gradient(135deg,transparent 46%,var(--muted) 46%,var(--muted) 54%,transparent 54%),var(--surface)}
+.sw[aria-checked="true"]{outline:3px solid var(--ink);outline-offset:2px}
 .gprog{flex:none;align-self:center;border:1px solid var(--line);border-radius:999px;padding:5px 10px;background:transparent;color:var(--muted);font-family:var(--label);font-weight:700;font-size:13px;letter-spacing:.03em;white-space:nowrap}
 .gprog.on{background:var(--wax);border-color:var(--wax);color:#2a2100}
 .goal .t{flex:1;min-width:0}
@@ -672,7 +680,8 @@ function goalRow(g){
   if(g.done)when='Done '+fmtDate(g.doneAt);
   else if(g.due){const d=daysTo(g.due);when=d<0?`<span class="late">${-d} day${d===-1?'':'s'} past ${fmtDate(g.due)}</span>`:d===0?'Due today':`By ${fmtDate(g.due)} · ${d} day${d===1?'':'s'} left`}
   const ip=goalInProgress(g);
-  return `<div class="goal ${g.done?'done':''} ${ip?'inprog':''}" ${g.done?'':`data-sortitem="goal" data-key="${esc(g.id)}"`}>
+  const gc=/^#[0-9a-f]{6}$/i.test(g.color||'')?g.color:'';
+  return `<div class="goal ${g.done?'done':''} ${ip?'inprog':''} ${gc?'tinted':''}" ${gc?`style="--gc:${gc}"`:''} ${g.done?'':`data-sortitem="goal" data-key="${esc(g.id)}"`}>
     <button class="chk" data-done="${g.id}" aria-label="${g.done?'Mark not done':'Mark done'}">${g.done?'✓':''}</button>
     <div class="t"><div class="gt">${esc(goalLabel(g))}</div>${when?`<div class="gm">${when}</div>`:''}</div>
     ${g.done?'':`<button class="gprog ${ip?'on':''}" data-gprog="${esc(g.id)}" aria-pressed="${ip}">In progress</button>`}
@@ -845,18 +854,22 @@ function levelUp(id){
   toast(ns==='landed'?`${t.name} landed! 🛹`:ns==='locked'?`${t.name} locked in`:`Working on ${t.name}`);
 }
 
+const GOAL_COLOURS=[['','None'],['#e5484d','Red'],['#f08c2b','Orange'],['#f2c230','Yellow'],['#2f9e5b','Green'],['#129a9a','Teal'],['#2f6fe4','Blue'],['#8a5ad6','Purple'],['#e15b9a','Pink']];
+const swatches=(cur,attr)=>`<div class="swatches" role="radiogroup" aria-label="Colour">${GOAL_COLOURS.map(([c,n])=>`<button type="button" class="sw ${c?'':'none'}" ${attr}="${c}" style="${c?'--sw:'+c:''}" role="radio" aria-checked="${(cur||'')===c}" aria-label="${n}" title="${n}"></button>`).join('')}</div>`;
 function goalSheet(id){
-  const g=id?state.goals.find(x=>x.id===id):null;let confirmDel=false;
+  const g=id?state.goals.find(x=>x.id===id):null;let confirmDel=false,colour=g?.color||'';
   openSheet(`<h2>${g?'Edit goal':'New goal for '+esc(state.riders[ui.rider].name)}</h2>
     <div class="field"><label class="lbl" for="gtext">Goal</label><input id="gtext" value="${esc(g?goalLabel(g):'')}" placeholder="e.g. Land a kickflip at the park" ${g&&g.trickId?'readonly':''}>${g&&g.trickId?'<span class="note">Linked to a trick. It ticks itself off when the trick is landed.</span>':''}</div>
     <div class="field"><label class="lbl" for="gdue">Target date (optional)</label><input id="gdue" type="date" value="${esc(g?.due||'')}"></div>
+    <div class="field"><span class="lbl">Colour</span>${swatches(colour,'data-gc')}</div>
     <div class="row"><button class="btn" id="save">${g?'Save':'Add goal'}</button><button class="btn ghost" id="cancel">Cancel</button></div>
     ${g?'<button class="btn danger" id="del">Delete goal</button>':''}`,s=>{
+    s.querySelector('.swatches').onclick=e=>{const b=e.target.closest('[data-gc]');if(!b)return;colour=b.dataset.gc;s.querySelectorAll('[data-gc]').forEach(x=>x.setAttribute('aria-checked',x.dataset.gc===colour))};
     s.querySelector('#cancel').onclick=closeSheet;
     s.querySelector('#save').onclick=()=>{
       const text=g&&g.trickId?goalLabel(g):s.querySelector('#gtext').value.trim();if(!text){s.querySelector('#gtext').focus();return}
       const base=g?(({id:_,...r})=>r)(g):{rider:ui.rider,done:false,created:Date.now()};
-      store.put('goals',g?g.id:uid(),{...base,text,due:s.querySelector('#gdue').value||''});
+      store.put('goals',g?g.id:uid(),{...base,text,due:s.querySelector('#gdue').value||'',color:colour});
       closeSheet();
     };
     if(g)s.querySelector('#del').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('goals',g.id);closeSheet();toast('Goal deleted')};
