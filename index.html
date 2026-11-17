@@ -606,7 +606,7 @@ function render(){
   const gProg=goals.filter(goalInProgress).length;
   $('#goalCount').textContent=goals.length?`${gProg?gProg+' in progress · ':''}${gDone} of ${goals.length} done`:'';
   const ord=x=>typeof x.order==='number'?x.order:1e9;
-  const gs=goals.slice().sort((a,b)=>(a.done-b.done)||(goalInProgress(b)-goalInProgress(a))||(ord(a)-ord(b))||((a.due||'9')<(b.due||'9')?-1:1));
+  const gs=goals.slice().sort((a,b)=>(a.done-b.done)||(ord(a)-ord(b))||((a.due||'9')<(b.due||'9')?-1:1));
   $('#goals').innerHTML=gs.length?gs.map(goalRow).join('')+`<button class="btn ghost" data-act="add-goal" style="width:100%">+ Add a goal</button>`:`<div class="empty">No goals for ${name} yet.<br>Try “Land a kickflip by the holidays” or “Drop in on the big bowl”.<br><button class="btn" data-act="add-goal">Set a goal</button></div>`;
 
   const locs=sortedLocs();
