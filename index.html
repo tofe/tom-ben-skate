@@ -608,7 +608,7 @@ function render(){
   const gProg=goals.filter(goalInProgress).length;
   $('#goalCount').textContent=goals.length?`${gProg?gProg+' in progress · ':''}${gDone} of ${goals.length} done`:'';
   const ord=x=>typeof x.order==='number'?x.order:1e9;
-  const gs=goals.slice().sort((a,b)=>(a.done-b.done)||(ord(a)-ord(b))||((a.due||'9')<(b.due||'9')?-1:1));
+  const gs=goals.slice().sort((a,b)=>(ord(a)-ord(b))||(a.done-b.done)||((a.due||'9')<(b.due||'9')?-1:1));
   $('#goals').innerHTML=gs.length?gs.map(goalRow).join('')+`<button class="btn ghost" data-act="add-goal" style="width:100%">+ Add a goal</button>`:`<div class="empty">No goals for ${name} yet.<br>Try “Land a kickflip by the holidays” or “Drop in on the big bowl”.<br><button class="btn" data-act="add-goal">Set a goal</button></div>`;
 
   const locs=sortedLocs();
@@ -699,11 +699,11 @@ function goalRow(g){
   else if(g.due){const d=daysTo(g.due);when=d<0?`<span class="late">${-d} day${d===-1?'':'s'} past ${fmtDate(g.due)}</span>`:d===0?'Due today':`By ${fmtDate(g.due)} · ${d} day${d===1?'':'s'} left`}
   const ip=goalInProgress(g);
   const gc=/^#[0-9a-f]{6}$/i.test(g.color||'')?g.color:'';
-  return `<div class="goal ${g.done?'done':''} ${ip?'inprog':''} ${gc?'tinted':''}" ${gc?`style="--gc:${gc}"`:''} ${g.done?'':`data-sortitem="goal" data-key="${esc(g.id)}"`}>
+  return `<div class="goal ${g.done?'done':''} ${ip?'inprog':''} ${gc?'tinted':''}" ${gc?`style="--gc:${gc}"`:''} data-sortitem="goal" data-key="${esc(g.id)}">
     <button class="chk" data-done="${g.id}" aria-label="${g.done?'Mark not done':'Mark done'}">${g.done?'✓':''}</button>
     <div class="t"><div class="gt">${esc(goalLabel(g))}</div>${when?`<div class="gm">${when}</div>`:''}</div>
     ${g.done?'':`<button class="gprog ${ip?'on':''}" data-gprog="${esc(g.id)}" aria-pressed="${ip}">In progress</button>`}
-    <button class="x" data-gedit="${g.id}">Edit</button>${g.done?'':`<button class="handle" data-drag aria-label="Drag to move this goal">${GRIP}</button>`}
+    <button class="x" data-gedit="${g.id}">Edit</button><button class="handle" data-drag aria-label="Drag to move this goal">${GRIP}</button>
   </div>`;
 }
 
