@@ -708,7 +708,7 @@ function goalRow(g){
   return `<div class="goal ${g.done?'done':''} ${ip?'inprog':''} ${gc?'tinted':''}" ${gc?`style="--gc:${gc}"`:''} data-sortitem="goal" data-key="${esc(g.id)}">
     <button class="chk" data-done="${g.id}" aria-label="${g.done?'Mark not done':'Mark done'}">${g.done?'✓':''}</button>
     <div class="t"><div class="gt">${esc(goalLabel(g))}</div>${when?`<div class="gm">${when}</div>`:''}${landCounter(g)}</div>
-    ${g.done?'':`<button class="gprog ${ip?'on':''}" data-gprog="${esc(g.id)}" aria-pressed="${ip}">In progress</button>`}
+    ${!g.done&&ip?`<button class="gprog on" data-gprog="${esc(g.id)}" aria-pressed="true" aria-label="In progress. Tap to stop">In progress</button>`:''}
     <button class="x" data-gedit="${g.id}">Edit</button><button class="handle" data-drag aria-label="Drag to move this goal">${GRIP}</button>
   </div>`;
 }
@@ -892,6 +892,7 @@ function goalSheet(id){
   openSheet(`<h2>${g?'Edit goal':'New goal for '+esc(state.riders[ui.rider].name)}</h2>
     <div class="field"><label class="lbl" for="gtext">Goal</label><input id="gtext" value="${esc(g?goalLabel(g):'')}" placeholder="e.g. Land a kickflip at the park" ${g&&g.trickId?'readonly':''}>${g&&g.trickId?'<span class="note">Linked to a trick. Lands in runs add to its count; tick it off yourself when it is done.</span>':''}</div>
     <div class="field"><label class="lbl" for="gdue">Target date (optional)</label><input id="gdue" type="date" value="${esc(g?.due||'')}"></div>
+    ${g&&!g.done?`<label class="goalrow"><input type="checkbox" id="gip" ${goalInProgress(g)?'checked':''}><span><b>In progress</b><span class="note">Shows a yellow In progress tag on the home page.</span></span></label>`:''}
     <div class="field"><span class="lbl">Colour</span>${swatches(colour,'data-gc')}</div>
     <div class="row"><button class="btn" id="save">${g?'Save':'Add goal'}</button><button class="btn ghost" id="cancel">Cancel</button></div>
     ${g?'<button class="btn danger" id="del">Delete goal</button>':''}`,s=>{
@@ -900,7 +901,8 @@ function goalSheet(id){
     s.querySelector('#save').onclick=()=>{
       const text=g&&g.trickId?goalLabel(g):s.querySelector('#gtext').value.trim();if(!text){s.querySelector('#gtext').focus();return}
       const base=g?(({id:_,...r})=>r)(g):{rider:ui.rider,done:false,created:Date.now()};
-      store.put('goals',g?g.id:uid(),{...base,text,due:s.querySelector('#gdue').value||'',color:colour});
+      const gip=s.querySelector('#gip');const prog=gip?{progress:gip.checked}:{};
+      store.put('goals',g?g.id:uid(),{...base,...prog,text,due:s.querySelector('#gdue').value||'',color:colour});
       closeSheet();
     };
     if(g)s.querySelector('#del').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('goals',g.id);closeSheet();toast('Goal deleted')};
@@ -917,7 +919,7 @@ function landCounter(g){
 }
 function bumpLands(g,d){
   if(!g)return;const before=landsOf(g),n=Math.max(0,before+d);if(n===before)return;
-  const {id,...r}=g;g.lands=n;store.put('goals',id,{...r,lands:n});
+  const {id,...r}=g;g.lands=n;const extra=d>0&&!g.done&&g.progress===false?{progress:true}:{};Object.assign(g,extra);store.put('goals',id,{...r,lands:n,...extra});
   if(d>0&&before<LAND_TARGET&&n>=LAND_TARGET)toast(`${LAND_TARGET} lands! Tick the goal when you're ready to call it done`);
 }
 function goalInProgress(g){
