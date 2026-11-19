@@ -145,6 +145,13 @@ h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0}
 .goal.tinted .chk{border-color:color-mix(in srgb,var(--gc) 70%,var(--ink))}
 .goal.tinted.done .chk{background:color-mix(in srgb,var(--gc) 70%,var(--ink))}
 .goal.tinted.inprog{border-left-color:var(--wax)!important}
+.lands{display:flex;align-items:center;gap:6px;margin-top:6px}
+.lands .lbtn{flex:none;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:18px;font-weight:700;line-height:1;padding:0;display:grid;place-items:center}
+.lands .lbtn:disabled{opacity:.35}
+.lpips.full i.on{background:var(--locked)}
+.lnum{font-family:var(--label);font-weight:700;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.lnum.full{color:var(--locked)}
+.goal.done .gm{text-decoration:none}
 .swatches{display:flex;flex-wrap:wrap;gap:10px}
 .sw{width:36px;height:36px;border-radius:50%;border:2px solid var(--line);background:var(--sw);padding:0;cursor:pointer}
 .sw.none{background:linear-gradient(135deg,transparent 46%,var(--muted) 46%,var(--muted) 54%,transparent 54%),var(--surface)}
@@ -701,7 +708,7 @@ function goalRow(g){
   const gc=/^#[0-9a-f]{6}$/i.test(g.color||'')?g.color:'';
   return `<div class="goal ${g.done?'done':''} ${ip?'inprog':''} ${gc?'tinted':''}" ${gc?`style="--gc:${gc}"`:''} data-sortitem="goal" data-key="${esc(g.id)}">
     <button class="chk" data-done="${g.id}" aria-label="${g.done?'Mark not done':'Mark done'}">${g.done?'✓':''}</button>
-    <div class="t"><div class="gt">${esc(goalLabel(g))}</div>${when?`<div class="gm">${when}</div>`:''}</div>
+    <div class="t"><div class="gt">${esc(goalLabel(g))}</div>${when?`<div class="gm">${when}</div>`:''}${landCounter(g)}</div>
     ${g.done?'':`<button class="gprog ${ip?'on':''}" data-gprog="${esc(g.id)}" aria-pressed="${ip}">In progress</button>`}
     <button class="x" data-gedit="${g.id}">Edit</button><button class="handle" data-drag aria-label="Drag to move this goal">${GRIP}</button>
   </div>`;
@@ -900,6 +907,24 @@ function goalSheet(id){
     if(g)s.querySelector('#del').onclick=e=>{if(!confirmDel){confirmDel=true;e.target.textContent='Tap again to delete';return}store.del('goals',g.id);closeSheet();toast('Goal deleted')};
   });
 }
+const LAND_TARGET=5;
+function runLandsFor(tid){let n=0;state.runs.forEach(r=>(r.items||[]).forEach(i=>{if(i.tid===tid&&i.res==='land')n++}));return n}
+function landsOf(g){return typeof g.lands==='number'?Math.max(0,g.lands):(g.trickId?runLandsFor(g.trickId):0)}
+function landCounter(g){
+  const n=landsOf(g),full=n>=LAND_TARGET;
+  return `<div class="lands ${full?'full':''}"><button class="lbtn" data-gl="${esc(g.id)}" data-d="-1" aria-label="One less land" ${n?'':'disabled'}>−</button>
+    <span class="pips lpips ${full?'full':''}" role="img" aria-label="${n} of ${LAND_TARGET} lands">${Array.from({length:LAND_TARGET},(_,i)=>`<i class="${i<n?'on':''}"></i>`).join('')}</span>
+    <button class="lbtn" data-gl="${esc(g.id)}" data-d="1" aria-label="One more land">+</button><span class="lnum ${full?'full':''}">${full?n+' lands':n+'/'+LAND_TARGET+' lands'}</span></div>`;
+}
+function bumpLands(g,d){
+  if(!g)return;const before=landsOf(g),n=Math.max(0,before+d);if(n===before)return;
+  const {id,...r}=g;g.lands=n;store.put('goals',id,{...r,lands:n});
+  if(d>0&&before<LAND_TARGET&&n>=LAND_TARGET){
+    const t=g.trickId&&state.tricks.find(x=>x.id===g.trickId);
+    if(t&&t.status!=='locked'){const {id:tid,...tr}=t;store.put('tricks',tid,{...tr,status:'locked',updated:Date.now()});toast(`${LAND_TARGET} lands! ${fullName(t)} is locked in`)}
+    else toast(`${LAND_TARGET} lands!`);
+  }
+}
 function goalInProgress(g){
   if(g.done)return false;
   const t=g.trickId&&state.tricks.find(x=>x.id===g.trickId);
@@ -980,6 +1005,7 @@ document.addEventListener('click',e=>{
   if(b.dataset.edit){editTrick(b.dataset.edit);return}
   if(b.dataset.done){toggleGoal(b.dataset.done);return}
   if(b.dataset.gprog){toggleGoalProgress(b.dataset.gprog);return}
+  if(b.dataset.gl){bumpLands(state.goals.find(x=>x.id===b.dataset.gl),+b.dataset.d);render();return}
   if(b.dataset.gedit){goalSheet(b.dataset.gedit);return}
   if(b.dataset.act==='toggle-tricks'){ui.allTricks=!ui.allTricks;render();if(!ui.allTricks)document.getElementById('tricks').scrollIntoView({block:'nearest'});return}
   if(b.dataset.act==='add-trick'){trickSheet();return}
@@ -1443,7 +1469,10 @@ function runSheet(id,initial,back){
       if(b.dataset.rm!==undefined){d.items.splice(+b.dataset.rm,1);draw();saveS();return}
       if(b.dataset.mv!==undefined){const i=+b.dataset.mv,j=i+(+b.dataset.d);if(j<0||j>=d.items.length)return;[d.items[i],d.items[j]]=[d.items[j],d.items[i]];draw();saveS();
         const nb=s.querySelector(`[data-mv="${j}"][data-d="${b.dataset.d}"]`)||s.querySelector(`[data-mv="${j}"]`);nb&&!nb.disabled&&nb.focus();return}
-      const it=d.items[+b.dataset.i];if(!it)return;it.res=it.res===b.dataset.v?'':b.dataset.v;draw();save();if(it.res==='land'&&promoteTrick(it.tid,d.at))toast(`${it.name} moved to Landed`)};
+      const it=d.items[+b.dataset.i];if(!it)return;const was=it.res;it.res=it.res===b.dataset.v?'':b.dataset.v;draw();save();
+      if(it.res==='land'&&promoteTrick(it.tid,d.at))toast(`${it.name} moved to Landed`);
+      // count lands toward the trick's goal (10 to lock it in)
+      if(it.tid&&(was==='land')!==(it.res==='land'))setTimeout(()=>bumpLands(state.goals.find(g=>g.trickId===it.tid),it.res==='land'?1:-1),0)};
     s.querySelector('#raddBtn').onclick=()=>{const src=state.tricks.find(x=>x.id===s.querySelector('#radd').value);if(!src)return;const t=trickFor(d.rider,src);
       d.items.push({tid:t.id,name:fullName(t),res:'',obstacle:t.locId===d.locId&&t.obstacle?t.obstacle:''});draw();saveS()};
     s.querySelector('#ritems').addEventListener('change',e=>{const el=e.target.closest('select.robs');if(!el)return;const it=d.items[+el.dataset.oi];if(it){it.obstacle=el.value;saveS()}});
